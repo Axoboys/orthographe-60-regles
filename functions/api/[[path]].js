@@ -21,10 +21,28 @@ async function sha256(value) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return bytesToB64(new Uint8Array(digest));
 }
-async function passwordHash(password, saltB64, iterations = ITERATIONS) {
+async function passwordHash(password, saltB64, iterations = ITERATIONS, onStage = null) {
+  onStage?.("hachage_generation_sel");
   const salt = saltB64 ? b64ToBytes(saltB64) : crypto.getRandomValues(new Uint8Array(16));
-  const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations }, material, 256);
+
+  onStage?.("hachage_importation_cle");
+  const passwordBytes = new TextEncoder().encode(password);
+  const material = await crypto.subtle.importKey(
+    "raw",
+    passwordBytes,
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits"]
+  );
+
+  onStage?.("hachage_derive_bits");
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: { name: "SHA-256" }, salt, iterations },
+    material,
+    256
+  );
+
+  onStage?.("hachage_encodage_resultat");
   return { hash: bytesToB64(new Uint8Array(bits)), salt: bytesToB64(salt), iterations };
 }
 function cookieValue(request, name) {
@@ -156,7 +174,7 @@ async function handle(request, env) {
       if (nameExists) return fail("Ce nom est déjà utilisé.", 409);
 
       stage = "hachage_mot_de_passe";
-      const hashed = await passwordHash(password);
+      const hashed = await passwordHash(password, undefined, ITERATIONS, value => { stage = value; });
 
       stage = "insertion_base_de_donnees";
       const id = randomId();
