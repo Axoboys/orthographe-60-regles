@@ -98,8 +98,8 @@ function validateQuestions(questions) {
   return result;
 }
 function publicQuestion(q) {
-  if (q.type === "choice") return { type: q.type, prompt: q.prompt, options: q.options, explanation: q.explanation };
-  return { type: q.type, prompt: q.prompt, explanation: q.explanation };
+  if (q.type === "choice") return { type: q.type, prompt: q.prompt, options: q.options };
+  return { type: q.type, prompt: q.prompt };
 }
 function normalizeAnswer(value) {
   return String(value ?? "").normalize("NFC").trim().toLocaleLowerCase("fr").replace(/\s+/g, " ");
