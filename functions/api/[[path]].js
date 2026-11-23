@@ -251,6 +251,8 @@ async function handle(request, env) {
     const title = cleanText(body.title, 160);
     const sections = validateSections(body.sections);
     if (!title || !sections) return fail("Ajoute un titre et au moins une partie avec son nom et sa règle.");
+    const totalRules = await env.DB.prepare("SELECT COUNT(*) AS total FROM rules").first();
+    if (Number(totalRules?.total || 0) >= 60) return fail("La limite de 60 règles est atteinte.", 409);
     const id = randomId();
     await env.DB.prepare("INSERT INTO rules (id, title, sections_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
       .bind(id, title, JSON.stringify(sections), nowIso(), nowIso()).run();
