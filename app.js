@@ -79,7 +79,7 @@ function renderShell(content, title, subtitle) {
   const isAdmin = state.me.role === "admin";
   root.innerHTML = '<div class="app-shell"><aside class="sidebar"><div class="brand">' + logo() + '</div>' +
     '<div class="nav-caption">ESPACE DE TRAVAIL</div><nav class="main-nav">' +
-    navButton("home", "⌂", "Accueil") + navButton("rules", "▤", "Liste des règles") + navButton("quizzes", "✎", "Quiz") + navButton("ranking", "♜", "Classement") +
+    navButton("home", "⌂", "Accueil") + navButton("rules", "▤", "Liste des règles") + navButton("quizzes", "✎", "Quiz") + navButton("ranking", "♜", "Classement") + navButton("account", "⚙", "Mon compte") +
     (isAdmin ? '<div class="nav-caption admin-caption">GESTION</div>' + navButton("admin", "⚙", "Administration") : '') +
     '</nav><div class="sidebar-bottom"><div class="sidebar-tip"><span class="tip-spark">✦</span><strong>Un peu chaque jour</strong><p>La régularité fait toute la différence.</p></div><div class="profile-mini"><div class="avatar">' + initials(state.me.username) + '</div><div class="profile-copy"><strong>' + esc(state.me.username) + '</strong><span>' + (isAdmin ? "Administrateur" : "Élève") + '</span></div><button class="logout-button" title="Se déconnecter" data-action="logout">↪</button></div></div></aside>' +
     '<main class="main-area"><header class="topbar"><div><span class="topbar-kicker">ESPACE DE RÉVISION</span><h1>' + esc(title) + '</h1><p>' + esc(subtitle || "") + '</p></div><div class="topbar-score"><span>TON SCORE</span><strong>' + Number(state.me.score || 0) + '<small> pts</small></strong></div></header>' +
