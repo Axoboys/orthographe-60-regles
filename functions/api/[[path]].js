@@ -187,7 +187,8 @@ async function handle(request, env) {
       return json({
         error: "Erreur pendant l'initialisation.",
         stage,
-        errorType: error?.name || "UnknownError"
+        errorType: error?.name || "UnknownError",
+        errorMessage: String(error?.message || "Aucun détail fourni").slice(0, 300)
       }, 500);
     }
   }
