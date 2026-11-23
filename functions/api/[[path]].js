@@ -340,7 +340,7 @@ async function handle(request, env) {
     return json({ ok: true, id }, 201);
   }
 
-  const definitionMatch = path.match(/^\\/api\\/admin\\/definitions\\/([a-zA-Z0-9-]+)$/);
+  const definitionMatch = path.match(/^\/api\/admin\/definitions\/([a-zA-Z0-9-]+)$/);
   if (definitionMatch && ["PUT", "DELETE"].includes(method)) {
     const id = definitionMatch[1];
     if (method === "DELETE") {
