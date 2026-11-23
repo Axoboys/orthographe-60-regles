@@ -300,6 +300,7 @@ export async function onRequest(context) {
   try {
     return await handle(context.request, context.env);
   } catch (error) {
+    console.error("API ERROR:", error?.stack || error);
     return json({ error: "Une erreur serveur est survenue. Vérifie la configuration et réessaie." }, 500);
   }
 }
