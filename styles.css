@@ -341,3 +341,13 @@ input::placeholder, textarea::placeholder { color: #b2aec0; }
 .definition-detail h2 { margin: 10px 0 14px; font: 800 28px "Manrope", sans-serif; color: var(--purple-dark); }
 .definition-detail p { color: var(--muted); font-size: 14px; line-height: 1.9; white-space: normal; }
 @media (max-width: 650px) { .definition-detail { padding: 20px; } .definition-detail h2 { font-size: 23px; } }
+
+/* Paramètres du compte */
+.account-panel { max-width: 680px; padding: 26px; }
+.account-panel .panel-heading { margin-bottom: 8px; }
+.account-panel .panel-heading h2 { font-size: 20px; }
+.account-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: var(--purple-soft); color: var(--purple); font-size: 18px; }
+.account-panel > .muted { margin: 0 0 22px; }
+.account-panel .form-stack { max-width: 480px; }
+.account-divider { height: 1px; background: var(--line); margin: 5px 0; }
+@media (max-width: 650px) { .account-panel { padding: 19px; } }
