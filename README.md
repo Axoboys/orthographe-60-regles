@@ -1,4 +1,4 @@
-# Orthographe 60 — site de révision
+# OrthoLab — site de révision
 
 Un espace de révision responsive pour une classe : fiches de règles, exceptions, quiz variés, comptes élèves, score et administration privée.
 
