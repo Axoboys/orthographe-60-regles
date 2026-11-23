@@ -30,7 +30,7 @@ Les mots de passe sont hachés avec PBKDF2-SHA-256 et un sel unique. Les session
 2. Choisis **Create application** puis **Pages**, et connecte ton compte GitHub.
 3. Sélectionne le dépôt `Axoboys/orthographe-60-regles` et la branche `main`.
 4. Choisis le préréglage **None** (aucun framework).
-5. Laisse la commande de build vide et mets le dossier de sortie sur `.` (racine du dépôt).
+5. Mets la commande de build à `exit 0` et le dossier de sortie sur `.` (racine du dépôt). Cloudflare recommande `exit 0` pour les sites sans compilation qui utilisent Pages Functions.
 6. Lance le déploiement.
 
 Les fichiers `functions/` seront utilisés automatiquement par Cloudflare Pages Functions.
