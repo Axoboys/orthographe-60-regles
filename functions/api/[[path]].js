@@ -233,6 +233,39 @@ async function handle(request, env) {
   }
 
   const currentUser = await auth(request, env);
+
+  if (method === "PATCH" && path === "/api/account") {
+    if (!currentUser) return fail("Connecte-toi pour modifier ton compte.", 401);
+    const body = await bodyJson(request);
+    const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
+    const username = cleanText(body.username, 20);
+    const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
+    if (!currentPassword) return fail("Saisis ton mot de passe actuel pour confirmer les changements.");
+    if (!USERNAME_RE.test(username)) return fail("Le pseudo doit contenir 3 à 20 caractères (lettres, chiffres, _ ou -).");
+    if (newPassword && (newPassword.length < 8 || newPassword.length > 200)) {
+      return fail("Le nouveau mot de passe doit contenir entre 8 et 200 caractères.");
+    }
+    if (!newPassword && username.toLocaleLowerCase("fr") === currentUser.username.toLocaleLowerCase("fr")) {
+      return fail("Aucune modification à enregistrer.");
+    }
+    const account = await env.DB.prepare("SELECT password_hash, password_salt, password_iterations FROM users WHERE id = ?").bind(currentUser.id).first();
+    const verified = await passwordHash(currentPassword, account.password_salt, account.password_iterations);
+    if (verified.hash !== account.password_hash) return fail("Le mot de passe actuel est incorrect.", 403);
+    const duplicate = await env.DB.prepare("SELECT id FROM users WHERE username = ? COLLATE NOCASE AND id <> ?").bind(username, currentUser.id).first();
+    if (duplicate) return fail("Ce pseudo est déjà utilisé.", 409);
+    if (env.ADMIN_USERNAME && currentUser.role !== "admin" && username.toLocaleLowerCase("fr") === String(env.ADMIN_USERNAME).toLocaleLowerCase("fr")) {
+      return fail("Ce pseudo est réservé.", 409);
+    }
+    if (newPassword) {
+      const hashed = await passwordHash(newPassword);
+      await env.DB.prepare("UPDATE users SET username = ?, password_hash = ?, password_salt = ?, password_iterations = ? WHERE id = ?")
+        .bind(username, hashed.hash, hashed.salt, hashed.iterations, currentUser.id).run();
+    } else {
+      await env.DB.prepare("UPDATE users SET username = ? WHERE id = ?").bind(username, currentUser.id).run();
+    }
+    const updated = await env.DB.prepare("SELECT id, username, role, score FROM users WHERE id = ?").bind(currentUser.id).first();
+    return json({ user: updated });
+  }
   if (path.startsWith("/api/admin/") && path !== "/api/admin/setup") {
     if (!currentUser) return fail("Connecte-toi pour continuer.", 401);
     if (currentUser.role !== "admin") return fail("Accès réservé à l’administration.", 403);
