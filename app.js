@@ -247,7 +247,7 @@ root.addEventListener("click", async function (event) {
     const rule = collectRule(form);
     rule.sections.splice(Number(button.dataset.index), 1);
     if (!rule.sections.length) rule.sections.push({ name: "", rule: "", exception: "" });
-    state.editingRule = rule; render();
+    state.ruleDraft = rule; render();
   }
   if (action === "edit-rule") {
     state.editingRule = state.rules.find(r => r.id === button.dataset.id) || null;
