@@ -21,6 +21,8 @@ button { cursor: pointer; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid rgba(112, 98, 200, .25); outline-offset: 2px; }
 #app { min-height: 100vh; }
 .boot-screen { min-height: 100vh; display: grid; place-content: center; justify-items: center; color: var(--muted); gap: 12px; }
+.logo-mark-image { width: 46px; height: 46px; flex: 0 0 46px; display: block; object-fit: contain; border-radius: 15px; box-shadow: 0 8px 18px rgba(93, 77, 179, .18); }
+.boot-logo { width: 54px; height: 54px; display: block; border-radius: 16px; }
 .logo-mark { width: 46px; height: 46px; flex: 0 0 46px; display: grid; place-items: center; border-radius: 15px; background: linear-gradient(145deg, #8275dc, #5a4caf); color: white; font-family: "Manrope", sans-serif; font-size: 19px; font-weight: 800; box-shadow: 0 8px 18px rgba(93, 77, 179, .25); }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .brand-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
