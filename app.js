@@ -181,6 +181,10 @@ function renderAdmin() {
   let content = state.adminTab === "rules" ? renderAdminRules() : state.adminTab === "exercises" ? renderAdminExercises() : state.adminTab === "definitions" ? renderAdminDefinitions() : renderAdminUsers();
   renderShell('<div class="admin-welcome"><div><span class="eyebrow light-eyebrow">ESPACE PRIVÉ</span><h2>Le tableau de bord admin.</h2><p>Gère les règles, prépare les entraînements et suis les scores de la classe.</p></div><div class="admin-lock">⚙</div></div>' + tabs + content, "Administration", "Cette zone est réservée au compte administrateur.");
 }
+function renderAccount() {
+  const content = '<section class="panel account-panel"><div class="panel-heading"><div><span class="eyebrow">PARAMÈTRES PERSONNELS</span><h2>Modifier mon compte</h2></div><div class="account-icon">⚙</div></div><p class="muted">Tu peux changer ton pseudo et ton mot de passe. Ton score et tes résultats seront conservés.</p><form id="account-form" class="form-stack"><label>Nouveau pseudo<input name="username" value="' + esc(state.me.username) + '" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_-]+"></label><label>Mot de passe actuel<input name="current-password" type="password" autocomplete="current-password" required></label><div class="account-divider"></div><label>Nouveau mot de passe <span class="optional">(facultatif)</span><input name="new-password" type="password" autocomplete="new-password" minlength="8" maxlength="200" placeholder="8 caractères minimum"></label><label>Confirmer le nouveau mot de passe<input name="confirm-password" type="password" autocomplete="new-password" minlength="8" maxlength="200" placeholder="Retape ton nouveau mot de passe"></label><div class="form-actions"><button class="btn btn-primary" type="submit">Enregistrer les modifications</button></div></form></section>';
+  renderShell(content, "Mon compte", "Gère ton pseudo et ton mot de passe.");
+}
 function render() {
   if (!state.me) return renderAuth();
   if (state.view === "home") return renderHome();
@@ -191,6 +195,7 @@ function render() {
   if (state.view === "quiz-runner") return renderQuizRunner();
   if (state.view === "quiz-result") return renderQuizResult();
   if (state.view === "ranking") return renderRanking();
+  if (state.view === "account") return renderAccount();
   if (state.view === "admin" && state.me.role === "admin") return renderAdmin();
   state.view = "home";
   renderHome();
@@ -302,6 +307,20 @@ root.addEventListener("submit", async function (event) {
   event.preventDefault();
   state.error = ""; state.notice = "";
   try {
+    if (form.id === "account-form") {
+      const data = new FormData(form);
+      const newPassword = String(data.get("new-password") || "");
+      const confirmPassword = String(data.get("confirm-password") || "");
+      if (newPassword !== confirmPassword) throw new Error("Les deux nouveaux mots de passe ne correspondent pas.");
+      const result = await api("/api/account", { method: "PATCH", body: {
+        username: data.get("username"),
+        currentPassword: data.get("current-password"),
+        newPassword
+      }});
+      state.me = result.user;
+      await loadData();
+      say("Ton compte a bien été mis à jour.");
+    }
     if (form.id === "auth-form") {
       const data = new FormData(form);
       const endpoint = state.authMode === "login" ? "/api/auth/login" : "/api/auth/register";
