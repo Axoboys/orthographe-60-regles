@@ -250,6 +250,10 @@ async function handle(request, env) {
     const rows = await env.DB.prepare("SELECT username, score FROM users ORDER BY score DESC, username COLLATE NOCASE ASC LIMIT 20").all();
     return json({ leaderboard: rows.results || [] });
   }
+  if (method === "GET" && path === "/api/definitions") {
+    const rows = await env.DB.prepare("SELECT id, word, definition FROM definitions ORDER BY word COLLATE NOCASE ASC").all();
+    return json({ definitions: rows.results || [] });
+  }
   if (method === "GET" && path === "/api/admin/users") {
     const rows = await env.DB.prepare("SELECT username, role, score, created_at FROM users ORDER BY created_at ASC").all();
     return json({ users: rows.results || [] });
@@ -320,6 +324,37 @@ async function handle(request, env) {
     const sections = validateSections(body.sections);
     if (!title || !sections) return fail("Ajoute un titre et au moins une partie avec son nom et sa règle.");
     await env.DB.prepare("UPDATE rules SET title = ?, sections_json = ?, updated_at = ? WHERE id = ?").bind(title, JSON.stringify(sections), nowIso(), id).run();
+    return json({ ok: true });
+  }
+
+  if (method === "POST" && path === "/api/admin/definitions") {
+    const body = await bodyJson(request);
+    const word = cleanText(body.word, 100);
+    const definition = cleanText(body.definition, 3000);
+    if (!word || !definition) return fail("Saisis un mot et sa définition.");
+    const duplicate = await env.DB.prepare("SELECT id FROM definitions WHERE word = ? COLLATE NOCASE").bind(word).first();
+    if (duplicate) return fail("Ce mot possède déjà une définition. Modifie celle qui existe.", 409);
+    const id = randomId();
+    await env.DB.prepare("INSERT INTO definitions (id, word, definition, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+      .bind(id, word, definition, nowIso(), nowIso()).run();
+    return json({ ok: true, id }, 201);
+  }
+
+  const definitionMatch = path.match(/^\\/api\\/admin\\/definitions\\/([a-zA-Z0-9-]+)$/);
+  if (definitionMatch && ["PUT", "DELETE"].includes(method)) {
+    const id = definitionMatch[1];
+    if (method === "DELETE") {
+      await env.DB.prepare("DELETE FROM definitions WHERE id = ?").bind(id).run();
+      return json({ ok: true });
+    }
+    const body = await bodyJson(request);
+    const word = cleanText(body.word, 100);
+    const definition = cleanText(body.definition, 3000);
+    if (!word || !definition) return fail("Saisis un mot et sa définition.");
+    const duplicate = await env.DB.prepare("SELECT id FROM definitions WHERE word = ? COLLATE NOCASE AND id <> ?").bind(word, id).first();
+    if (duplicate) return fail("Un autre mot possède déjà cette orthographe.", 409);
+    await env.DB.prepare("UPDATE definitions SET word = ?, definition = ?, updated_at = ? WHERE id = ?")
+      .bind(word, definition, nowIso(), id).run();
     return json({ ok: true });
   }
 
