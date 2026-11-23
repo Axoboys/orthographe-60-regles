@@ -18,8 +18,8 @@ function linkedText(value) {
   definitions.forEach(definition => {
     const word = String(definition.word || "");
     if (!word) return;
-    const escapedWord = word.replace(/[|\\{}()[\]^$+*?.-]/g, "\\function initials(name) { return String(name || "?").slice(0, 1).toUpperCase(); }");
-    const pattern = new RegExp("(^|[^\\\\p{L}\\\\p{N}_])(" + escapedWord + ")(?=$|[^\\\\p{L}\\\\p{N}_])", "giu");
+    const escapedWord = word.replace(/[.*+?^\${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp("(^|[^\\p{L}\\p{N}_])(" + escapedWord + ")(?=$|[^\\p{L}\\p{N}_])", "giu");
     html = html.replace(pattern, (match, prefix, found) =>
       prefix + '<a class="defined-word" href="#" data-action="open-definition" data-id="' + esc(definition.id) + '">' + found + '</a>'
     );
