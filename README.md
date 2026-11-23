@@ -28,20 +28,20 @@ Les mots de passe sont hachés avec PBKDF2-SHA-256 et un sel unique. Les session
 
 1. Ouvre le tableau de bord Cloudflare, puis **Workers & Pages**.
 2. Choisis **Create application** puis **Pages**, et connecte ton compte GitHub.
-3. Sélectionne le dépôt \`Axoboys/orthographe-60-regles\` et la branche \`main\`.
+3. Sélectionne le dépôt `Axoboys/orthographe-60-regles` et la branche `main`.
 4. Choisis le préréglage **None** (aucun framework).
-5. Laisse la commande de build vide et mets le dossier de sortie sur \`.\` (racine du dépôt).
+5. Laisse la commande de build vide et mets le dossier de sortie sur `.` (racine du dépôt).
 6. Lance le déploiement.
 
-Les fichiers \`functions/\` seront utilisés automatiquement par Cloudflare Pages Functions.
+Les fichiers `functions/` seront utilisés automatiquement par Cloudflare Pages Functions.
 
 ### 2. Créer et relier la base D1
 
-1. Dans Cloudflare, ouvre **D1 SQL Database** (ou la section D1 de Workers & Pages) et crée une base nommée \`orthographe-60-db\`.
+1. Dans Cloudflare, ouvre **D1 SQL Database** (ou la section D1 de Workers & Pages) et crée une base nommée `orthographe-60-db`.
 2. Ouvre l'onglet **Console** de cette base.
-3. Copie-colle tout le contenu du fichier \`migrations/0001_initial.sql\` de ce dépôt, puis exécute-le.
+3. Copie-colle tout le contenu du fichier `migrations/0001_initial.sql` de ce dépôt, puis exécute-le.
 4. Ouvre ton projet Pages : **Settings → Bindings → Add → D1 database**.
-5. Comme nom de variable (binding), écris exactement \`DB\`, puis sélectionne \`orthographe-60-db\`.
+5. Comme nom de variable (binding), écris exactement `DB`, puis sélectionne `orthographe-60-db`.
 6. Enregistre et redéploie le projet pour que la fonction prenne en compte le binding.
 
 ### 3. Configurer le compte administrateur
@@ -50,15 +50,15 @@ Dans les paramètres de ton projet Pages, ouvre **Settings → Variables and Sec
 
 | Nom | Type | Valeur |
 | --- | --- | --- |
-| \`ADMIN_USERNAME\` | Variable | L'identifiant admin que tu as choisi, par exemple \`ProfOrthographe\` |
-| \`ADMIN_SETUP_KEY\` | Secret | Une longue clé aléatoire que tu gardes privée |
+| `ADMIN_USERNAME` | Variable | L'identifiant admin que tu as choisi, par exemple `ProfOrthographe` |
+| `ADMIN_SETUP_KEY` | Secret | Une longue clé aléatoire que tu gardes privée |
 
-La clé \`ADMIN_SETUP_KEY\` doit rester confidentielle. Ne la colle pas dans GitHub, dans le code, ni dans un message. Enregistre les changements et redéploie.
+La clé `ADMIN_SETUP_KEY` doit rester confidentielle. Ne la colle pas dans GitHub, dans le code, ni dans un message. Enregistre les changements et redéploie.
 
 Puis :
 1. Ouvre l'adresse du site.
 2. Sur l'écran de connexion, clique sur **Initialiser le compte administrateur**.
-3. Saisis l'identifiant configuré dans \`ADMIN_USERNAME\`, choisis un mot de passe solide d'au moins 10 caractères et entre la clé \`ADMIN_SETUP_KEY\`.
+3. Saisis l'identifiant configuré dans `ADMIN_USERNAME`, choisis un mot de passe solide d'au moins 10 caractères et entre la clé `ADMIN_SETUP_KEY`.
 4. Une fois créé, ce formulaire d'initialisation est désactivé. Connecte-toi normalement avec ce compte.
 
 L'initialisation ne peut réussir qu'une fois par base D1. Les autres comptes créés depuis le site ont automatiquement le rôle élève.
@@ -85,22 +85,22 @@ Dans **Administration → Exercices**, choisis la règle, donne un titre, puis c
 
 Trois formats sont acceptés :
 
-### QCM (\`choice\`)
-- \`options\` : liste de propositions.
-- \`answer\` : index de la bonne proposition, en commençant à \`0\`.
+### QCM (`choice`)
+- `options` : liste de propositions.
+- `answer` : index de la bonne proposition, en commençant à `0`.
 
-### Vrai/faux (\`boolean\`)
-- \`answer\` : \`true\` ou \`false\`.
+### Vrai/faux (`boolean`)
+- `answer` : `true` ou `false`.
 
-### Réponse écrite (\`text\`)
-- \`accepted\` : liste des réponses acceptées.
+### Réponse écrite (`text`)
+- `accepted` : liste des réponses acceptées.
 - La comparaison ignore la casse et les espaces en trop, mais respecte les accents et les lettres. Cela permet de travailler réellement l'orthographe.
 
-Chaque question peut avoir une explication avec \`explanation\`.
+Chaque question peut avoir une explication avec `explanation`.
 
 Exemple complet à coller :
 
-\`\`\`json
+```json
 [
   {
     "type": "choice",
@@ -122,7 +122,7 @@ Exemple complet à coller :
     "explanation": "Le pluriel de cheval est chevaux."
   }
 ]
-\`\`\`
+```
 
 Les réponses correctes sont conservées dans la base et ne sont envoyées à l'élève qu'après validation du quiz.
 
@@ -136,7 +136,7 @@ Les réponses correctes sont conservées dans la base et ne sont envoyées à l'
 
 ## Développement local (facultatif)
 
-Pour tester localement, installe Node.js puis Wrangler et lance Pages en mode développement avec un binding D1 local. La configuration locale doit utiliser le binding \`DB\` et la migration SQL avant de lancer les quiz. Le déploiement Cloudflare Pages relié à GitHub reste le chemin le plus simple pour la mise en ligne.
+Pour tester localement, installe Node.js puis Wrangler et lance Pages en mode développement avec un binding D1 local. La configuration locale doit utiliser le binding `DB` et la migration SQL avant de lancer les quiz. Le déploiement Cloudflare Pages relié à GitHub reste le chemin le plus simple pour la mise en ligne.
 
 ## Documentation Cloudflare
 
