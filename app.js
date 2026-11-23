@@ -1,9 +1,9 @@
 const root = document.getElementById("app");
 const state = {
   me: null, adminSetupAvailable: false, view: "home", authMode: "login", setupMode: false,
-  rules: [], exercises: [], leaderboard: [], users: [],
-  selectedRule: null, activeQuiz: null, quizResult: null,
-  adminTab: "rules", editingRule: null, ruleDraft: null, notice: "", error: ""
+  rules: [], exercises: [], leaderboard: [], users: [], definitions: [],
+  selectedRule: null, selectedDefinition: null, activeQuiz: null, quizResult: null,
+  adminTab: "rules", editingRule: null, ruleDraft: null, editingDefinition: null, notice: "", error: ""
 };
 
 function esc(value) {
@@ -12,6 +12,20 @@ function esc(value) {
   });
 }
 function initials(name) { return String(name || "?").slice(0, 1).toUpperCase(); }
+function linkedText(value) {
+  let html = esc(value);
+  const definitions = [...state.definitions].sort((a, b) => b.word.length - a.word.length);
+  definitions.forEach(definition => {
+    const word = String(definition.word || "");
+    if (!word) return;
+    const escapedWord = word.replace(/[|\\{}()[\]^$+*?.-]/g, "\\function initials(name) { return String(name || "?").slice(0, 1).toUpperCase(); }");
+    const pattern = new RegExp("(^|[^\\\\p{L}\\\\p{N}_])(" + escapedWord + ")(?=$|[^\\\\p{L}\\\\p{N}_])", "giu");
+    html = html.replace(pattern, (match, prefix, found) =>
+      prefix + '<a class="defined-word" href="#" data-action="open-definition" data-id="' + esc(definition.id) + '">' + found + '</a>'
+    );
+  });
+  return html;
+}
 function say(message, isError) {
   state.notice = isError ? "" : message;
   state.error = isError ? message : "";
@@ -93,8 +107,8 @@ function renderRules() {
 function renderRuleDetail() {
   const rule = state.rules.find(r => r.id === state.selectedRule);
   if (!rule) { state.view = "rules"; return renderRules(); }
-  const blocks = rule.sections.map((section, i) => '<article class="rule-section"><div class="section-number">' + String(i + 1).padStart(2, "0") + '</div><div class="section-body"><h3>' + esc(section.name) + '</h3><p>' + esc(section.rule).replace(/\n/g, "<br>") + '</p>' +
-    (section.exception ? '<div class="exception-box"><strong>À retenir · Exception</strong><p>' + esc(section.exception).replace(/\n/g, "<br>") + '</p></div>' : '') + '</div></article>').join("");
+  const blocks = rule.sections.map((section, i) => '<article class="rule-section"><div class="section-number">' + String(i + 1).padStart(2, "0") + '</div><div class="section-body"><h3>' + esc(section.name) + '</h3><p>' + linkedText(section.rule).replace(/\n/g, "<br>") + '</p>' +
+    (section.exception ? '<div class="exception-box"><strong>À retenir · Exception</strong><p>' + linkedText(section.exception).replace(/\n/g, "<br>") + '</p></div>' : '') + '</div></article>').join("");
   const related = state.exercises.filter(e => e.rule_id === rule.id);
   const content = '<button class="back-link" data-action="navigate" data-view="rules">← Retour aux règles</button><section class="detail-hero"><span class="eyebrow light-eyebrow">FICHE DE RÉVISION</span><h2>' + esc(rule.title) + '</h2><p>' + rule.sections.length + ' partie' + (rule.sections.length > 1 ? 's' : '') + ' à connaître</p></section><div class="detail-layout"><section class="panel detail-panel"><div class="panel-heading"><div><span class="eyebrow">LA LEÇON</span><h2>Comprendre la règle</h2></div></div>' + blocks + '</section><aside class="panel detail-aside"><div class="aside-icon">✎</div><h3>À toi de jouer !</h3><p>Vérifie que tu as bien compris cette règle avec les exercices associés.</p>' +
     (related.length ? related.map(e => '<button class="btn btn-primary btn-wide related-exercise" data-action="start-quiz" data-id="' + esc(e.id) + '">' + esc(e.title) + ' →</button>').join("") : '<p class="muted small">Aucun exercice associé pour le moment.</p>') + '</aside></div>';
@@ -124,6 +138,12 @@ function renderQuizRunner() {
   }).join("");
   renderShell('<button class="back-link" data-action="cancel-quiz">← Quitter le quiz</button><div class="quiz-runner-heading"><div><span class="eyebrow">SÉRIE EN COURS</span><h2>Concentre-toi, tu vas y arriver.</h2></div><span class="question-count">' + quiz.questions.length + ' questions</span></div><form id="quiz-form">' + cards + '<div class="quiz-submit-row"><p>Prends le temps de relire tes réponses avant de valider.</p><button class="btn btn-primary btn-large" type="submit">Corriger mes réponses →</button></div></form>', "Entraînement", "Réponds à chaque question puis valide ta série.");
 }
+function renderDefinitionDetail() {
+  const definition = state.definitions.find(item => item.id === state.selectedDefinition);
+  if (!definition) { state.view = "rules"; return renderRules(); }
+  const content = '<button class="back-link" data-action="navigate" data-view="rules">← Retour aux règles</button><section class="panel definition-detail"><span class="eyebrow">DÉFINITION</span><h2>' + esc(definition.word) + '</h2><p>' + esc(definition.definition).replace(/\n/g, "<br>") + '</p></section>';
+  renderShell(content, "Définition", "Retrouve l’explication de ce mot.");
+}
 function renderQuizResult() {
   const result = state.quizResult;
   const rows = result.results.map((r, i) => '<article class="result-row ' + (r.correct ? "is-correct" : "is-wrong") + '"><div class="result-symbol">' + (r.correct ? "✓" : "×") + '</div><div><strong>Question ' + (i + 1) + ' · ' + (r.correct ? "Bonne réponse" : "À revoir") + '</strong>' + (r.correct ? '' : '<p>Réponse attendue : <b>' + esc(r.expected) + '</b></p>') + (r.explanation ? '<p>' + esc(r.explanation) + '</p>' : '') + '</div><span class="result-points">' + (r.correct ? "+1" : "−1") + '</span></article>').join("");
@@ -145,13 +165,20 @@ function renderAdminRules() {
 function renderAdminExercises() {
   return '<section class="panel admin-form-panel"><div class="panel-heading"><div><span class="eyebrow">NOUVELLE SÉRIE</span><h2>Ajouter des exercices</h2></div><span class="admin-panel-icon">✎</span></div><p class="muted">Colle ici la série JSON que je t’aurai préparée à partir de la règle étudiée. La correction reste enregistrée côté serveur.</p><form id="exercise-form" class="form-stack"><label>Règle associée<select name="exercise-rule" required><option value="">Choisir une règle…</option>' + state.rules.map(r => '<option value="' + esc(r.id) + '">' + esc(r.title) + '</option>').join("") + '</select></label><label>Nom de la série<input name="exercise-title" required maxlength="160" placeholder="Ex. Entraînement — Les pluriels"></label><label>Petite description <span class="optional">(facultatif)</span><input name="exercise-description" maxlength="500" placeholder="QCM, vrai/faux, phrases à compléter…"></label><label>Exercices au format JSON<textarea name="exercise-json" rows="15" spellcheck="false" required placeholder="Colle ici le JSON complet préparé pour ta règle…"></textarea></label><div class="json-help"><strong>Formats acceptés</strong><p><code>choice</code> : QCM avec <code>options</code> et <code>answer</code> (numéro de la bonne option, en commençant à 0).</p><p><code>boolean</code> : vrai/faux avec <code>answer: true</code> ou <code>false</code>.</p><p><code>text</code> : réponse écrite avec <code>accepted</code> (liste des réponses acceptées).</p><p>Chaque série doit contenir entre 3 et 30 questions. Une explication par réponse est vivement conseillée.</p></div><button class="btn btn-primary" type="submit">Enregistrer la série d’exercices →</button></form></section><section class="panel admin-list-panel"><div class="panel-heading"><div><span class="eyebrow">SÉRIES PUBLIÉES</span><h2>Exercices existants</h2></div></div>' + (state.exercises.length ? state.exercises.map(e => '<div class="admin-list-row"><div class="admin-list-copy"><strong>' + esc(e.title) + '</strong><span>' + esc(e.rule_title) + '</span></div><button class="icon-button danger-icon" data-action="delete-exercise" data-id="' + esc(e.id) + '" title="Supprimer">×</button></div>').join("") : '<p class="muted">Aucune série publiée pour le moment.</p>') + '</section>';
 }
+function renderAdminDefinitions() {
+  const current = state.editingDefinition || { word: "", definition: "" };
+  const rows = state.definitions.length ? state.definitions.map(item =>
+    '<div class="admin-list-row"><div class="admin-list-copy"><strong>' + esc(item.word) + '</strong><span>' + esc(item.definition) + '</span></div><button class="btn btn-small btn-outline" data-action="edit-definition" data-id="' + esc(item.id) + '">Modifier</button><button class="icon-button danger-icon" data-action="delete-definition" data-id="' + esc(item.id) + '" title="Supprimer">×</button></div>'
+  ).join("") : '<p class="muted">Aucun mot défini pour le moment.</p>';
+  return '<section class="panel admin-form-panel"><div class="panel-heading"><div><span class="eyebrow">' + (state.editingDefinition ? "MODIFICATION" : "NOUVEAU MOT") + '</span><h2>' + (state.editingDefinition ? "Modifier la définition" : "Ajouter un mot") + '</h2></div></div><form id="definition-form" class="form-stack"><label>Mot<input name="definition-word" required maxlength="100" value="' + esc(current.word) + '" placeholder="Ex. syllabe"></label><label>Définition<textarea name="definition-text" required maxlength="3000" rows="4" placeholder="Écris la définition du mot…">' + esc(current.definition) + '</textarea></label><div class="form-actions"><button class="btn btn-primary" type="submit">' + (state.editingDefinition ? "Enregistrer les modifications" : "Ajouter le mot") + '</button>' + (state.editingDefinition ? '<button class="text-button" type="button" data-action="cancel-edit-definition">Annuler</button>' : '') + '</div></form><p class="muted small">Chaque occurrence du mot dans les leçons sera soulignée en pointillés. Un clic ouvrira sa définition.</p></section><section class="panel admin-list-panel"><div class="panel-heading"><div><span class="eyebrow">LEXIQUE</span><h2>Mots enregistrés</h2></div><span class="count-pill">' + state.definitions.length + '</span></div>' + rows + '</section>';
+}
 function renderAdminUsers() {
   return '<section class="panel admin-list-panel"><div class="panel-heading"><div><span class="eyebrow">COMPTES INSCRITS</span><h2>Élèves et scores</h2></div><span class="count-pill">' + state.users.length + ' compte' + (state.users.length > 1 ? 's' : '') + '</span></div>' +
     (state.users.length ? state.users.map(u => '<div class="admin-list-row"><div class="avatar">' + initials(u.username) + '</div><div class="admin-list-copy"><strong>' + esc(u.username) + '</strong><span>' + (u.role === "admin" ? "Administrateur" : "Élève") + '</span></div><strong class="leader-points">' + u.score + ' pts</strong></div>').join("") : '<p class="muted">Aucun compte pour le moment.</p>') + '</section>';
 }
 function renderAdmin() {
-  const tabs = '<div class="admin-tabs"><button class="' + (state.adminTab === "rules" ? "active" : "") + '" data-action="admin-tab" data-tab="rules">Règles</button><button class="' + (state.adminTab === "exercises" ? "active" : "") + '" data-action="admin-tab" data-tab="exercises">Exercices</button><button class="' + (state.adminTab === "users" ? "active" : "") + '" data-action="admin-tab" data-tab="users">Comptes</button></div>';
-  let content = state.adminTab === "rules" ? renderAdminRules() : state.adminTab === "exercises" ? renderAdminExercises() : renderAdminUsers();
+  const tabs = '<div class="admin-tabs"><button class="' + (state.adminTab === "rules" ? "active" : "") + '" data-action="admin-tab" data-tab="rules">Règles</button><button class="' + (state.adminTab === "exercises" ? "active" : "") + '" data-action="admin-tab" data-tab="exercises">Exercices</button><button class="' + (state.adminTab === "definitions" ? "active" : "") + '" data-action="admin-tab" data-tab="definitions">Définitions</button><button class="' + (state.adminTab === "users" ? "active" : "") + '" data-action="admin-tab" data-tab="users">Comptes</button></div>';
+  let content = state.adminTab === "rules" ? renderAdminRules() : state.adminTab === "exercises" ? renderAdminExercises() : state.adminTab === "definitions" ? renderAdminDefinitions() : renderAdminUsers();
   renderShell('<div class="admin-welcome"><div><span class="eyebrow light-eyebrow">ESPACE PRIVÉ</span><h2>Le tableau de bord admin.</h2><p>Gère les règles, prépare les entraînements et suis les scores de la classe.</p></div><div class="admin-lock">⚙</div></div>' + tabs + content, "Administration", "Cette zone est réservée au compte administrateur.");
 }
 function render() {
@@ -159,6 +186,7 @@ function render() {
   if (state.view === "home") return renderHome();
   if (state.view === "rules") return renderRules();
   if (state.view === "rule-detail") return renderRuleDetail();
+  if (state.view === "definition-detail") return renderDefinitionDetail();
   if (state.view === "quizzes") return renderQuizzes();
   if (state.view === "quiz-runner") return renderQuizRunner();
   if (state.view === "quiz-result") return renderQuizResult();
@@ -169,11 +197,12 @@ function render() {
 }
 async function loadData() {
   const results = await Promise.all([
-    api("/api/rules"), api("/api/exercises"), api("/api/leaderboard")
+    api("/api/rules"), api("/api/exercises"), api("/api/leaderboard"), api("/api/definitions")
   ]);
   state.rules = results[0].rules || [];
   state.exercises = results[1].exercises || [];
   state.leaderboard = results[2].leaderboard || [];
+  state.definitions = results[3].definitions || [];
   if (state.me.role === "admin") {
     const admin = await api("/api/admin/users");
     state.users = admin.users || [];
@@ -229,9 +258,17 @@ root.addEventListener("click", async function (event) {
     await refreshMe();
   }
   if (action === "open-rule") { state.selectedRule = button.dataset.id; state.view = "rule-detail"; render(); }
+  if (action === "open-definition") { state.selectedDefinition = button.dataset.id; state.view = "definition-detail"; render(); }
   if (action === "start-quiz") await startQuiz(button.dataset.id);
   if (action === "cancel-quiz") { state.activeQuiz = null; state.view = "quizzes"; render(); }
-  if (action === "admin-tab") { state.adminTab = button.dataset.tab; state.editingRule = null; state.ruleDraft = null; render(); }
+  if (action === "admin-tab") { state.adminTab = button.dataset.tab; state.editingRule = null; state.ruleDraft = null; state.editingDefinition = null; render(); }
+  if (action === "edit-definition") { state.editingDefinition = state.definitions.find(item => item.id === button.dataset.id) || null; state.adminTab = "definitions"; render(); }
+  if (action === "cancel-edit-definition") { state.editingDefinition = null; render(); }
+  if (action === "delete-definition") {
+    if (!confirm("Supprimer cette définition ?")) return;
+    try { await api("/api/admin/definitions/" + encodeURIComponent(button.dataset.id), { method: "DELETE" }); state.editingDefinition = null; await loadData(); say("Définition supprimée."); }
+    catch (error) { say(error.message, true); }
+  }
   if (action === "add-section") {
     const rule = collectRule(document.getElementById("rule-form"));
     rule.sections.push({ name: "", rule: "", exception: "" });
@@ -298,6 +335,18 @@ root.addEventListener("submit", async function (event) {
         description: data.get("exercise-description"), questions: questions
       }});
       await loadData(); say("Série d’exercices publiée avec succès.");
+    }
+    if (form.id === "definition-form") {
+      const data = new FormData(form);
+      const payload = { word: data.get("definition-word"), definition: data.get("definition-text") };
+      if (state.editingDefinition) {
+        await api("/api/admin/definitions/" + encodeURIComponent(state.editingDefinition.id), { method: "PUT", body: payload });
+        state.editingDefinition = null;
+        await loadData(); say("Définition mise à jour.");
+      } else {
+        await api("/api/admin/definitions", { method: "POST", body: payload });
+        await loadData(); say("Mot ajouté au lexique.");
+      }
     }
     if (form.id === "quiz-form") {
       const quiz = state.activeQuiz;
