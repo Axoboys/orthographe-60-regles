@@ -323,3 +323,19 @@ input::placeholder, textarea::placeholder { color: #b2aec0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* Mots reliés au lexique */
+.defined-word {
+  color: var(--purple-dark);
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--purple);
+  text-underline-offset: 3px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.defined-word:hover { color: var(--purple); text-decoration-style: solid; }
+.definition-detail { max-width: 780px; padding: 28px; }
+.definition-detail h2 { margin: 10px 0 14px; font: 800 28px "Manrope", sans-serif; color: var(--purple-dark); }
+.definition-detail p { color: var(--muted); font-size: 14px; line-height: 1.9; white-space: normal; }
+@media (max-width: 650px) { .definition-detail { padding: 20px; } .definition-detail h2 { font-size: 23px; } }
