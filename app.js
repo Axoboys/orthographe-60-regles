@@ -3,7 +3,7 @@ const state = {
   me: null, adminSetupAvailable: false, view: "home", authMode: "login", setupMode: false,
   rules: [], exercises: [], leaderboard: [], users: [],
   selectedRule: null, activeQuiz: null, quizResult: null,
-  adminTab: "rules", editingRule: null, notice: "", error: ""
+  adminTab: "rules", editingRule: null, ruleDraft: null, notice: "", error: ""
 };
 
 function esc(value) {
@@ -134,7 +134,7 @@ function renderRanking() {
   renderShell('<section class="ranking-hero"><span class="eyebrow light-eyebrow">PROGRESSION DE LA CLASSE</span><h2>Chaque point compte.</h2><p>Le classement se met à jour après chaque quiz corrigé.</p></section><section class="panel full-ranking"><div class="panel-heading"><div><span class="eyebrow">TOP DE LA CLASSE</span><h2>Classement général</h2></div><span class="panel-medal">♜</span></div>' + (rows || '<p class="muted">Pas encore de score enregistré.</p>') + '</section>', "Classement", "Découvre la progression de tous les comptes.");
 }
 function getAdminRuleForm() {
-  const rule = state.editingRule || { title: "", sections: [{ name: "", rule: "", exception: "" }] };
+  const rule = state.ruleDraft || state.editingRule || { title: "", sections: [{ name: "", rule: "", exception: "" }] };
   const sections = rule.sections.map((section, i) => '<div class="section-editor"><div class="editor-heading"><strong>Partie ' + (i + 1) + '</strong>' + (rule.sections.length > 1 ? '<button class="icon-button" type="button" data-action="remove-section" data-index="' + i + '" title="Supprimer cette partie">×</button>' : '') + '</div><label>Nom de la partie<input name="section-name-' + i + '" value="' + esc(section.name) + '" required placeholder="Ex. Le pluriel des noms"></label><label>Règle<textarea name="section-rule-' + i + '" required rows="3" placeholder="Explique la règle…">' + esc(section.rule) + '</textarea></label><label>Exception <span class="optional">(facultatif)</span><textarea name="section-exception-' + i + '" rows="2" placeholder="Ajoute une exception si nécessaire…">' + esc(section.exception) + '</textarea></label></div>').join("");
   return '<section class="panel admin-form-panel"><div class="panel-heading"><div><span class="eyebrow">' + (state.editingRule ? "MODIFICATION" : "NOUVELLE FICHE") + '</span><h2>' + (state.editingRule ? "Modifier une règle" : "Ajouter une règle") + '</h2></div></div><form id="rule-form"><label>Nom de la règle<input name="rule-title" value="' + esc(rule.title) + '" required maxlength="160" placeholder="Ex. L’accord du participe passé"></label><div id="section-editors">' + sections + '</div><div class="form-actions"><button class="btn btn-outline" type="button" data-action="add-section">+ Ajouter une partie</button><button class="btn btn-primary" type="submit">' + (state.editingRule ? "Enregistrer les modifications" : "Ajouter la règle") + '</button>' + (state.editingRule ? '<button class="text-button" type="button" data-action="cancel-edit-rule">Annuler</button>' : '') + '</div></form></section>';
 }
@@ -236,11 +236,11 @@ root.addEventListener("click", async function (event) {
   if (action === "open-rule") { state.selectedRule = button.dataset.id; state.view = "rule-detail"; render(); }
   if (action === "start-quiz") await startQuiz(button.dataset.id);
   if (action === "cancel-quiz") { state.activeQuiz = null; state.view = "quizzes"; render(); }
-  if (action === "admin-tab") { state.adminTab = button.dataset.tab; state.editingRule = null; render(); }
+  if (action === "admin-tab") { state.adminTab = button.dataset.tab; state.editingRule = null; state.ruleDraft = null; render(); }
   if (action === "add-section") {
     const rule = collectRule(document.getElementById("rule-form"));
     rule.sections.push({ name: "", rule: "", exception: "" });
-    state.editingRule = rule; render();
+    state.ruleDraft = rule; render();
   }
   if (action === "remove-section") {
     const form = document.getElementById("rule-form");
@@ -251,9 +251,9 @@ root.addEventListener("click", async function (event) {
   }
   if (action === "edit-rule") {
     state.editingRule = state.rules.find(r => r.id === button.dataset.id) || null;
-    state.adminTab = "rules"; render();
+    state.ruleDraft = null; state.adminTab = "rules"; render();
   }
-  if (action === "cancel-edit-rule") { state.editingRule = null; render(); }
+  if (action === "cancel-edit-rule") { state.editingRule = null; state.ruleDraft = null; render(); }
   if (action === "delete-rule") {
     if (!confirm("Supprimer cette règle et ses séries d’exercices associées ?")) return;
     try { await api("/api/admin/rules/" + encodeURIComponent(button.dataset.id), { method: "DELETE" }); await loadData(); say("Règle supprimée."); }
@@ -287,10 +287,10 @@ root.addEventListener("submit", async function (event) {
       const payload = collectRule(form);
       if (state.editingRule) {
         await api("/api/admin/rules/" + encodeURIComponent(state.editingRule.id), { method: "PUT", body: payload });
-        state.editingRule = null; await loadData(); say("Règle mise à jour.");
+        state.editingRule = null; state.ruleDraft = null; await loadData(); say("Règle mise à jour.");
       } else {
         await api("/api/admin/rules", { method: "POST", body: payload });
-        await loadData(); say("Règle ajoutée.");
+        state.ruleDraft = null; state.editingRule = null; await loadData(); say("Règle ajoutée.");
       }
     }
     if (form.id === "exercise-form") {
