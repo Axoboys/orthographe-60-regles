@@ -127,21 +127,51 @@ async function handle(request, env) {
   }
 
   if (method === "POST" && path === "/api/admin/setup") {
-    const body = await bodyJson(request);
-    if (!env.ADMIN_SETUP_KEY || !env.ADMIN_USERNAME || !body.setupKey || body.setupKey !== env.ADMIN_SETUP_KEY) return fail("Clé d’initialisation incorrecte.", 403);
-    const existing = await env.DB.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").first();
-    if (existing) return fail("Le compte administrateur est déjà initialisé.", 409);
-    const username = cleanText(body.username, 20);
-    const password = typeof body.password === "string" ? body.password : "";
-    if (username.toLocaleLowerCase("fr") !== String(env.ADMIN_USERNAME).toLocaleLowerCase("fr")) return fail("Utilise le nom d’administrateur défini dans la configuration.", 400);
-    if (!USERNAME_RE.test(username) || password.length < 10 || password.length > 200) return fail("Nom invalide ou mot de passe trop court (10 caractères minimum).", 400);
-    const nameExists = await env.DB.prepare("SELECT id FROM users WHERE username = ? COLLATE NOCASE").bind(username).first();
-    if (nameExists) return fail("Ce nom est déjà utilisé.", 409);
-    const hashed = await passwordHash(password);
-    const id = randomId();
-    await env.DB.prepare("INSERT INTO users (id, username, password_hash, password_salt, password_iterations, role, score, created_at) VALUES (?, ?, ?, ?, ?, 'admin', 0, ?)")
-      .bind(id, username, hashed.hash, hashed.salt, hashed.iterations, nowIso()).run();
-    return json({ ok: true, message: "Compte administrateur créé. Tu peux maintenant te connecter." }, 201);
+    let stage = "lecture";
+
+    try {
+      const body = await bodyJson(request);
+
+      stage = "configuration";
+      if (!env.ADMIN_SETUP_KEY || !env.ADMIN_USERNAME || !body.setupKey || body.setupKey !== env.ADMIN_SETUP_KEY) {
+        return fail("Clé d’initialisation incorrecte.", 403);
+      }
+
+      stage = "verification_admin";
+      const existing = await env.DB.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").first();
+      if (existing) return fail("Le compte administrateur est déjà initialisé.", 409);
+
+      stage = "validation";
+      const username = cleanText(body.username, 20);
+      const password = typeof body.password === "string" ? body.password : "";
+      if (username.toLocaleLowerCase("fr") !== String(env.ADMIN_USERNAME).toLocaleLowerCase("fr")) {
+        return fail("Utilise le nom d’administrateur défini dans la configuration.", 400);
+      }
+      if (!USERNAME_RE.test(username) || password.length < 10 || password.length > 200) {
+        return fail("Nom invalide ou mot de passe trop court (10 caractères minimum).", 400);
+      }
+
+      stage = "verification_identifiant";
+      const nameExists = await env.DB.prepare("SELECT id FROM users WHERE username = ? COLLATE NOCASE").bind(username).first();
+      if (nameExists) return fail("Ce nom est déjà utilisé.", 409);
+
+      stage = "hachage_mot_de_passe";
+      const hashed = await passwordHash(password);
+
+      stage = "insertion_base_de_donnees";
+      const id = randomId();
+      await env.DB.prepare("INSERT INTO users (id, username, password_hash, password_salt, password_iterations, role, score, created_at) VALUES (?, ?, ?, ?, ?, 'admin', 0, ?)")
+        .bind(id, username, hashed.hash, hashed.salt, hashed.iterations, nowIso()).run();
+
+      return json({ ok: true, message: "Compte administrateur créé. Tu peux maintenant te connecter." }, 201);
+    } catch (error) {
+      console.error("ADMIN SETUP ERROR:", stage, error?.stack || error);
+      return json({
+        error: "Erreur pendant l'initialisation.",
+        stage,
+        errorType: error?.name || "UnknownError"
+      }, 500);
+    }
   }
 
   if (method === "POST" && path === "/api/auth/register") {
