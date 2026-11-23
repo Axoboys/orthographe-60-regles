@@ -54,7 +54,7 @@ function emptyState(title, copy, action) {
   return '<div class="empty-state"><div class="empty-icon">✦</div><h3>' + esc(title) + '</h3><p>' + esc(copy) + '</p>' + (action || "") + '</div>';
 }
 function logo() {
-  return '<div class="logo-mark">60</div><div class="brand-copy"><strong>Orthographe 60</strong><span>Apprendre, comprendre, réussir</span></div>';
+  return '<div class="logo-mark">OL</div><div class="brand-copy"><strong>OrthoLab</strong><span>Apprendre, comprendre, réussir</span></div>';
 }
 function renderAuth() {
   const setup = state.setupMode && state.adminSetupAvailable;
@@ -83,7 +83,7 @@ function renderShell(content, title, subtitle) {
     (isAdmin ? '<div class="nav-caption admin-caption">GESTION</div>' + navButton("admin", "⚙", "Administration") : '') +
     '</nav><div class="sidebar-bottom"><div class="sidebar-tip"><span class="tip-spark">✦</span><strong>Un peu chaque jour</strong><p>La régularité fait toute la différence.</p></div><div class="profile-mini"><div class="avatar">' + initials(state.me.username) + '</div><div class="profile-copy"><strong>' + esc(state.me.username) + '</strong><span>' + (isAdmin ? "Administrateur" : "Élève") + '</span></div><button class="logout-button" title="Se déconnecter" data-action="logout">↪</button></div></div></aside>' +
     '<main class="main-area"><header class="topbar"><div><span class="topbar-kicker">ESPACE DE RÉVISION</span><h1>' + esc(title) + '</h1><p>' + esc(subtitle || "") + '</p></div><div class="topbar-score"><span>TON SCORE</span><strong>' + Number(state.me.score || 0) + '<small> pts</small></strong></div></header>' +
-    '<div class="page-content">' + noticeHTML() + content + '</div><footer class="page-footer">Orthographe 60 <span>·</span> Chaque exercice est une occasion de progresser.</footer></main></div>';
+    '<div class="page-content">' + noticeHTML() + content + '</div><footer class="page-footer">OrthoLab <span>·</span> Chaque exercice est une occasion de progresser.</footer></main></div>';
 }
 function renderHome() {
   const completed = state.exercises.length;
