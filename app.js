@@ -54,7 +54,7 @@ function emptyState(title, copy, action) {
   return '<div class="empty-state"><div class="empty-icon">✦</div><h3>' + esc(title) + '</h3><p>' + esc(copy) + '</p>' + (action || "") + '</div>';
 }
 function logo() {
-  return '<div class="logo-mark">OL</div><div class="brand-copy"><strong>OrthoLab</strong><span>Apprendre, comprendre, réussir</span></div>';
+  return '<img class="logo-mark-image" src="/favicon.svg" alt=""><div class="brand-copy"><strong>OrthoLab</strong><span>Apprendre, comprendre, réussir</span></div>';
 }
 function renderAuth() {
   const setup = state.setupMode && state.adminSetupAvailable;
