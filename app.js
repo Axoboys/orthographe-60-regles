@@ -381,6 +381,22 @@ root.addEventListener("click", async function (event) {
     catch (error) { say(error.message, true); }
   }
 });
+root.addEventListener("pointerdown", function(event) {
+  const card = event.target.closest("#flash-card[data-kind='word']");
+  if (card) state.flashDragStart = event.clientX;
+});
+root.addEventListener("pointerup", function(event) {
+  if (state.flashDragStart === null || state.view !== "flash-runner") return;
+  const delta = event.clientX - state.flashDragStart;
+  state.flashDragStart = null;
+  if (Math.abs(delta) < 65) return;
+  answerFlashcard(delta < 0);
+});
+document.addEventListener("keydown", function(event) {
+  if (state.view !== "flash-runner" || state.flashSession?.cards[state.flashIndex]?.kind !== "word") return;
+  if (event.key === "ArrowLeft") { event.preventDefault(); answerFlashcard(true); }
+  if (event.key === "ArrowRight") { event.preventDefault(); answerFlashcard(false); }
+});
 root.addEventListener("submit", async function (event) {
   const form = event.target;
   event.preventDefault();
