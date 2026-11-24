@@ -75,13 +75,25 @@ function renderAuth() {
 function navButton(view, symbol, label) {
   return '<button class="nav-link ' + (state.view === view ? "active" : "") + '" data-action="navigate" data-view="' + view + '"><span class="nav-symbol">' + symbol + '</span><span>' + label + '</span></button>';
 }
+function updateNetworkIndicator() {
+  const indicator = document.getElementById("network-status");
+  if (!indicator) return;
+  const online = navigator.onLine;
+  indicator.classList.toggle("is-online", online);
+  indicator.classList.toggle("is-offline", !online);
+  const label = indicator.querySelector(".network-status-label");
+  if (label) label.textContent = online ? "En ligne" : "Hors ligne";
+}
+window.addEventListener("online", updateNetworkIndicator);
+window.addEventListener("offline", updateNetworkIndicator);
+
 function renderShell(content, title, subtitle) {
   const isAdmin = state.me.role === "admin";
   const navigation = state.offlineMode ? navButton("rules", "▤", "Liste des règles") : navButton("home", "⌂", "Accueil") + navButton("rules", "▤", "Liste des règles") + navButton("flashcards", "▣", "Flashcards") + navButton("quizzes", "✎", "Quiz") + navButton("ranking", "♜", "Classement") + navButton("chat", "☷", "Tchat") + navButton("account", "⚙", "Mon compte") + (isAdmin ? '<div class="nav-caption admin-caption">GESTION</div>' + navButton("admin", "⚙", "Administration") : '');
   const profile = state.offlineMode ? '<div class="sidebar-bottom"><div class="sidebar-tip"><strong>Mode hors connexion</strong><p>Seules les règles enregistrées sont disponibles.</p></div></div>' : '<div class="sidebar-bottom"><div class="sidebar-tip"><span class="tip-spark">✦</span><strong>Un peu chaque jour</strong><p>La régularité fait toute la différence.</p></div><div class="profile-mini"><div class="avatar">' + initials(state.me.username) + '</div><div class="profile-copy"><strong>' + esc(state.me.username) + '</strong><span>' + (isAdmin ? "Administrateur" : "Élève") + '</span></div><button class="logout-button" title="Se déconnecter" data-action="logout">↪</button></div></div>';
   root.innerHTML = '<div class="app-shell"><aside class="sidebar"><div class="brand">' + logo() + '</div>' +
     '<div class="nav-caption">ESPACE DE TRAVAIL</div><nav class="main-nav">' + navigation + '</nav>' + profile + '</aside>' +
-    '<main class="main-area"><header class="topbar"><div><span class="topbar-kicker">ESPACE DE RÉVISION</span><h1>' + esc(title) + '</h1><p>' + esc(subtitle || "") + '</p></div>' + (state.offlineMode ? '<span class="rule-tag">HORS CONNEXION</span>' : '<div class="topbar-score"><span>TON SCORE</span><strong>' + Number(state.me.score || 0) + '<small> pts</small></strong></div>') + '</header>' +
+    '<main class="main-area"><header class="topbar"><div><span class="topbar-kicker">ESPACE DE RÉVISION</span><h1>' + esc(title) + '</h1><p>' + esc(subtitle || "") + '</p></div><div class="topbar-tools"><span id="network-status" class="network-status ' + (navigator.onLine ? 'is-online' : 'is-offline') + '" role="status" aria-live="polite"><span class="network-status-dot"></span><span class="network-status-label">' + (navigator.onLine ? 'En ligne' : 'Hors ligne') + '</span></span>' + (state.offlineMode ? '<span class="rule-tag">RÈGLES ENREGISTRÉES</span>' : '<div class="topbar-score"><span>TON SCORE</span><strong>' + Number(state.me.score || 0) + '<small> pts</small></strong></div>') + '</div></header>' +
     '<div class="page-content">' + noticeHTML() + (state.offlineMode ? '<div class="alert alert-success" role="status">Tu consultes les règles sauvegardées sur cet appareil. Les exercices nécessitent une connexion Internet.</div>' : '') + content + '</div><footer class="page-footer">OrthoLab <span>·</span> Chaque exercice est une occasion de progresser.</footer></main></div>';
 }
 function renderHome() {
