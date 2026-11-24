@@ -287,6 +287,64 @@ async function handle(request, env) {
     const rows = await env.DB.prepare("SELECT id, word, definition FROM definitions ORDER BY word COLLATE NOCASE ASC").all();
     return json({ definitions: rows.results || [] });
   }
+
+  if (method === "GET" && path === "/api/chat/messages") {
+    if (!currentUser) return fail("Connecte-toi pour accéder au tchat.", 401);
+    const rows = await env.DB.prepare("SELECT m.id, m.message, m.created_at, u.username, u.id AS user_id FROM chat_messages m JOIN users u ON u.id = m.user_id ORDER BY m.created_at DESC LIMIT 100").all();
+    return json({ messages: (rows.results || []).reverse() });
+  }
+  if (method === "POST" && path === "/api/chat/messages") {
+    if (!currentUser) return fail("Connecte-toi pour envoyer un message.", 401);
+    const body = await bodyJson(request);
+    const message = cleanText(body.message, 1000);
+    if (!message) return fail("Écris un message avant de l’envoyer.");
+    const id = randomId();
+    await env.DB.prepare("INSERT INTO chat_messages (id, user_id, message, created_at) VALUES (?, ?, ?, ?)").bind(id, currentUser.id, message, nowIso()).run();
+    return json({ ok: true, id }, 201);
+  }
+  const chatMatch = path.match(/^\\/api\\/chat\\/messages\\/([a-zA-Z0-9-]+)$/);
+  if (chatMatch && method === "DELETE") {
+    if (!currentUser) return fail("Connecte-toi pour continuer.", 401);
+    const message = await env.DB.prepare("SELECT user_id FROM chat_messages WHERE id = ?").bind(chatMatch[1]).first();
+    if (!message) return fail("Message introuvable.", 404);
+    if (message.user_id !== currentUser.id && currentUser.role !== "admin") return fail("Tu ne peux supprimer que tes messages.", 403);
+    await env.DB.prepare("DELETE FROM chat_messages WHERE id = ?").bind(chatMatch[1]).run();
+    return json({ ok: true });
+  }
+  if (method === "GET" && path === "/api/suggestions") {
+    if (!currentUser) return fail("Connecte-toi pour consulter les suggestions.", 401);
+    const sql = currentUser.role === "admin"
+      ? "SELECT s.id, s.word, s.definition, s.status, s.created_at, s.reviewed_at, u.username FROM word_suggestions s JOIN users u ON u.id = s.user_id ORDER BY CASE s.status WHEN 'pending' THEN 0 ELSE 1 END, s.created_at DESC LIMIT 200"
+      : "SELECT s.id, s.word, s.definition, s.status, s.created_at, s.reviewed_at, u.username FROM word_suggestions s JOIN users u ON u.id = s.user_id WHERE s.user_id = ? OR s.status = 'accepted' ORDER BY s.created_at DESC LIMIT 100";
+    const rows = currentUser.role === "admin" ? await env.DB.prepare(sql).all() : await env.DB.prepare(sql).bind(currentUser.id).all();
+    return json({ suggestions: rows.results || [] });
+  }
+  if (method === "POST" && path === "/api/suggestions") {
+    if (!currentUser) return fail("Connecte-toi pour proposer un mot.", 401);
+    const body = await bodyJson(request);
+    const word = cleanText(body.word, 100);
+    const definition = cleanText(body.definition, 1000);
+    if (!word) return fail("Saisis le mot que tu souhaites proposer.");
+    const id = randomId();
+    await env.DB.prepare("INSERT INTO word_suggestions (id, user_id, word, definition, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)").bind(id, currentUser.id, word, definition, nowIso()).run();
+    return json({ ok: true, id }, 201);
+  }
+  const suggestionMatch = path.match(/^\\/api\\/admin\\/suggestions\\/([a-zA-Z0-9-]+)$/);
+  if (suggestionMatch && method === "PATCH") {
+    const body = await bodyJson(request);
+    const status = cleanText(body.status, 20);
+    if (!["accepted", "rejected"].includes(status)) return fail("Statut invalide.");
+    const suggestion = await env.DB.prepare("SELECT id, word, definition FROM word_suggestions WHERE id = ?").bind(suggestionMatch[1]).first();
+    if (!suggestion) return fail("Suggestion introuvable.", 404);
+    if (status === "accepted") {
+      const existing = await env.DB.prepare("SELECT id FROM definitions WHERE word = ? COLLATE NOCASE").bind(suggestion.word).first();
+      if (!existing) {
+        await env.DB.prepare("INSERT INTO definitions (id, word, definition, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").bind(randomId(), suggestion.word, suggestion.definition || "Définition à compléter par l’administrateur.", nowIso(), nowIso()).run();
+      }
+    }
+    await env.DB.prepare("UPDATE word_suggestions SET status = ?, reviewed_at = ? WHERE id = ?").bind(status, nowIso(), suggestion.id).run();
+    return json({ ok: true, status });
+  }
   if (method === "GET" && path === "/api/admin/users") {
     const rows = await env.DB.prepare("SELECT username, role, score, created_at FROM users ORDER BY created_at ASC").all();
     return json({ users: rows.results || [] });
