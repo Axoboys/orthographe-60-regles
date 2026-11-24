@@ -3,7 +3,7 @@ const state = {
   me: null, adminSetupAvailable: false, view: "home", authMode: "login", setupMode: false,
   rules: [], exercises: [], leaderboard: [], users: [], definitions: [], chatMessages: [], suggestions: [], chatTab: "chat",
   selectedRule: null, selectedDefinition: null, activeQuiz: null, quizResult: null,
-  adminTab: "rules", editingRule: null, ruleDraft: null, editingDefinition: null, notice: "", error: ""
+  adminTab: "rules", editingRule: null, ruleDraft: null, editingDefinition: null, flashWords: [], flashSession: null, flashIndex: 0, flashAnswers: [], flashResult: null, flashDragStart: null, notice: "", error: ""
 };
 
 function esc(value) {
@@ -79,7 +79,7 @@ function renderShell(content, title, subtitle) {
   const isAdmin = state.me.role === "admin";
   root.innerHTML = '<div class="app-shell"><aside class="sidebar"><div class="brand">' + logo() + '</div>' +
     '<div class="nav-caption">ESPACE DE TRAVAIL</div><nav class="main-nav">' +
-    navButton("home", "⌂", "Accueil") + navButton("rules", "▤", "Liste des règles") + navButton("quizzes", "✎", "Quiz") + navButton("ranking", "♜", "Classement") + navButton("chat", "☷", "Tchat") + navButton("account", "⚙", "Mon compte") +
+    navButton("home", "⌂", "Accueil") + navButton("rules", "▤", "Liste des règles") + navButton("flashcards", "▣", "Flashcards") + navButton("quizzes", "✎", "Quiz") + navButton("ranking", "♜", "Classement") + navButton("chat", "☷", "Tchat") + navButton("account", "⚙", "Mon compte") +
     (isAdmin ? '<div class="nav-caption admin-caption">GESTION</div>' + navButton("admin", "⚙", "Administration") : '') +
     '</nav><div class="sidebar-bottom"><div class="sidebar-tip"><span class="tip-spark">✦</span><strong>Un peu chaque jour</strong><p>La régularité fait toute la différence.</p></div><div class="profile-mini"><div class="avatar">' + initials(state.me.username) + '</div><div class="profile-copy"><strong>' + esc(state.me.username) + '</strong><span>' + (isAdmin ? "Administrateur" : "Élève") + '</span></div><button class="logout-button" title="Se déconnecter" data-action="logout">↪</button></div></div></aside>' +
     '<main class="main-area"><header class="topbar"><div><span class="topbar-kicker">ESPACE DE RÉVISION</span><h1>' + esc(title) + '</h1><p>' + esc(subtitle || "") + '</p></div><div class="topbar-score"><span>TON SCORE</span><strong>' + Number(state.me.score || 0) + '<small> pts</small></strong></div></header>' +
@@ -138,7 +138,29 @@ function renderQuizRunner() {
   }).join("");
   renderShell('<button class="back-link" data-action="cancel-quiz">← Quitter le quiz</button><div class="quiz-runner-heading"><div><span class="eyebrow">SÉRIE EN COURS</span><h2>Concentre-toi, tu vas y arriver.</h2></div><span class="question-count">' + quiz.questions.length + ' questions</span></div><form id="quiz-form">' + cards + '<div class="quiz-submit-row"><p>Prends le temps de relire tes réponses avant de valider.</p><button class="btn btn-primary btn-large" type="submit">Corriger mes réponses →</button></div></form>', "Entraînement", "Réponds à chaque question puis valide ta série.");
 }
-function renderDefinitionDetail() {
+function renderFlashcards() {
+  const ready = state.flashWords.length >= 27 && state.rules.length >= 3;
+  const content = '<section class="flash-intro"><div><span class="eyebrow">MÉMORISATION ACTIVE</span><h2>Le défi des 30 cartes</h2><p>27 mots à vérifier et 3 règles à réécrire. Chaque bonne réponse rapporte 0,5 point.</p><button class="btn btn-primary btn-large" data-action="start-flashcards" ' + (ready ? '' : 'disabled') + '>Commencer une séance →</button></div><div class="flash-intro-number">30</div></section>' +
+    (!ready ? '<section class="panel"><p class="muted">La séance sera disponible dès que l’administrateur aura ajouté au moins 27 mots et enregistré 3 règles.</p></section>' : '<section class="panel"><strong>Comment jouer ?</strong><p class="muted">Mot correct : glisse à gauche dans la zone verte. Mot incorrect : glisse à droite dans la zone rouge. Tu peux aussi utiliser les boutons ou les flèches du clavier.</p><p class="muted">Aux questions 10, 20 et 30, réécris la règle demandée. Les mots importants sont vérifiés dans l’ordre, sans pénaliser les mots de liaison ou une petite faute de frappe.</p></section>');
+  renderShell(content, "Flashcards", "Une séance rapide pour mémoriser les bonnes orthographes.");
+}
+function renderFlashRunner() {
+  const session = state.flashSession;
+  if (!session) { state.view = "flashcards"; return renderFlashcards(); }
+  const card = session.cards[state.flashIndex];
+  const progress = Math.round((state.flashIndex / 30) * 100);
+  let face = card.kind === "word"
+    ? '<div class="flash-word">' + esc(card.word) + '</div><p class="muted">Ce mot est-il correctement orthographié ?</p><div class="flash-zones"><div class="flash-zone zone-green">← Correct</div><div class="flash-zone zone-red">Incorrect →</div></div><div class="flash-actions"><button class="btn btn-success" data-action="flash-answer" data-answer="true">← Correct</button><button class="btn btn-danger" data-action="flash-answer" data-answer="false">Incorrect →</button></div>'
+    : '<div class="flash-rule-label">QUESTION ' + (state.flashIndex + 1) + ' / 30 · RÈGLE À RÉÉCRIRE</div><h2>' + esc(card.title) + '</h2><p class="muted">Réécris la règle de mémoire, le plus fidèlement possible.</p><textarea id="flash-rule-answer" class="flash-rule-answer" rows="7" placeholder="Réécris la règle ici…"></textarea><button class="btn btn-primary btn-large" data-action="flash-rule-submit">Valider la règle →</button>';
+  renderShell('<div class="flash-progress"><div><strong>Question ' + (state.flashIndex + 1) + ' / 30</strong><span>' + Math.round(state.flashIndex * 100 / 30) + ' %</span></div><div class="flash-progress-track"><span style="width:' + progress + '%"></span></div></div><section class="panel flash-card" id="flash-card" data-kind="' + card.kind + '">' + face + '</section><button class="back-link" data-action="cancel-flashcards">← Quitter la séance</button>', "Séance flashcards", "Prends ton temps : chaque réponse est enregistrée pour la correction finale.");
+}
+function renderFlashResult() {
+  const result = state.flashResult;
+  const mistakes = result.results.filter(r => !r.correct);
+  const rows = result.results.map(r => '<article class="flash-result-row ' + (r.correct ? 'is-correct' : 'is-wrong') + '"><span>' + (r.correct ? '✓' : '×') + '</span><div><strong>Question ' + r.position + ' · ' + (r.kind === "word" ? esc(r.word) : esc(r.title)) + '</strong>' + (!r.correct ? (r.kind === "word" ? '<p>Réponse attendue : ' + esc(r.expected) + '</p>' : '<p>Règle attendue : ' + esc(r.expectedText) + '</p><details><summary>Ta réponse</summary><p>' + esc(r.answer) + '</p></details>') : '') + (r.explanation ? '<p>' + esc(r.explanation) + '</p>' : '') + (r.ruleId ? '<button class="link-button" data-action="flash-open-rule" data-id="' + esc(r.ruleId) + '">Voir la règle et ses exercices →</button>' : '') + '</div></article>').join("");
+  renderShell('<section class="result-hero"><span class="eyebrow light-eyebrow">SÉANCE TERMINÉE</span><h2>' + (mistakes.length ? 'Voici ce que tu peux encore travailler.' : 'Excellent travail !') + '</h2><div class="result-score">+' + result.points.toFixed(1) + '<small> points</small></div><p>Score total : <strong>' + result.score + ' points</strong></p><p>' + (30 - mistakes.length) + ' bonnes réponses sur 30</p></section><section class="panel result-panel"><div class="panel-heading"><div><span class="eyebrow">CORRECTION</span><h2>' + mistakes.length + ' erreur' + (mistakes.length > 1 ? 's' : '') + ' à revoir</h2></div></div>' + (rows || '<p class="muted">Aucune réponse à corriger.</p>') + '</section><div class="result-actions"><button class="btn btn-primary" data-action="navigate" data-view="flashcards">Nouvelle séance</button><button class="btn btn-outline" data-action="navigate" data-view="rules">Revoir les règles</button></div>', "Résultat des flashcards", "Retrouve tes erreurs et entraîne-toi sur les règles associées.");
+}
+function answerFlashcard(answer) {\n  state.flashAnswers.push(answer);\n  if (state.flashIndex < 29) { state.flashIndex++; render(); return; }\n  (async () => { try { const result = await api("/api/flashcards/submit", { method: "POST", body: { sessionId: state.flashSession.sessionId, answers: state.flashAnswers } }); state.flashResult = result; state.me.score = result.score; state.flashSession = null; await loadData(); state.view = "flash-result"; render(); } catch (error) { say(error.message, true); } })();\n}\nfunction renderDefinitionDetail() {
   const definition = state.definitions.find(item => item.id === state.selectedDefinition);
   if (!definition) { state.view = "rules"; return renderRules(); }
   const content = '<button class="back-link" data-action="navigate" data-view="rules">← Retour aux règles</button><section class="panel definition-detail"><span class="eyebrow">DÉFINITION</span><h2>' + esc(definition.word) + '</h2><p>' + esc(definition.definition).replace(/\n/g, "<br>") + '</p></section>';
@@ -189,13 +211,17 @@ function renderAdminDefinitions() {
   ).join("") : '<p class="muted">Aucun mot défini pour le moment.</p>';
   return '<section class="panel admin-form-panel"><div class="panel-heading"><div><span class="eyebrow">' + (state.editingDefinition ? "MODIFICATION" : "NOUVEAU MOT") + '</span><h2>' + (state.editingDefinition ? "Modifier la définition" : "Ajouter un mot") + '</h2></div></div><form id="definition-form" class="form-stack"><label>Mot<input name="definition-word" required maxlength="100" value="' + esc(current.word) + '" placeholder="Ex. syllabe"></label><label>Définition<textarea name="definition-text" required maxlength="3000" rows="4" placeholder="Écris la définition du mot…">' + esc(current.definition) + '</textarea></label><div class="form-actions"><button class="btn btn-primary" type="submit">' + (state.editingDefinition ? "Enregistrer les modifications" : "Ajouter le mot") + '</button>' + (state.editingDefinition ? '<button class="text-button" type="button" data-action="cancel-edit-definition">Annuler</button>' : '') + '</div></form><p class="muted small">Chaque occurrence du mot dans les leçons sera soulignée en pointillés. Un clic ouvrira sa définition.</p></section><section class="panel admin-list-panel"><div class="panel-heading"><div><span class="eyebrow">LEXIQUE</span><h2>Mots enregistrés</h2></div><span class="count-pill">' + state.definitions.length + '</span></div>' + rows + '</section>';
 }
+function renderAdminFlashcards() {
+  const rows = state.flashWords.map(w => '<div class="admin-list-row"><div class="admin-list-copy"><strong>' + esc(w.word) + '</strong><span>' + esc(w.rule_title) + ' · ' + (w.is_correct ? 'Orthographe correcte' : 'Orthographe incorrecte') + '</span></div><button class="icon-button danger-icon" data-action="delete-flash-word" data-id="' + esc(w.id) + '" title="Supprimer">×</button></div>').join("");
+  return '<section class="panel admin-form-panel"><div class="panel-heading"><div><span class="eyebrow">NOUVELLE CARTE</span><h2>Ajouter un mot</h2></div></div><p class="muted">Ajoute les graphies correctes et incorrectes avec leur règle associée. Prévois au moins 27 mots pour permettre une séance complète.</p><form id="flashcard-word-form" class="form-stack"><label>Règle associée<select name="ruleId" required><option value="">Choisir une règle…</option>' + state.rules.map(r => '<option value="' + esc(r.id) + '">' + esc(r.title) + '</option>').join("") + '</select></label><label>Mot affiché<input name="word" required maxlength="100" placeholder="Ex. aparence"></label><label>Orthographe du mot<select name="isCorrect"><option value="true">Correctement orthographié</option><option value="false">Incorrectement orthographié</option></select></label><label>Explication de la correction <span class="optional">(facultatif)</span><input name="explanation" maxlength="500" placeholder="Ex. Il faut deux p."></label><button class="btn btn-primary" type="submit">Ajouter cette carte →</button></form></section><section class="panel admin-list-panel"><div class="panel-heading"><div><span class="eyebrow">BANQUE DE MOTS</span><h2>Mots disponibles</h2></div><span class="count-pill">' + state.flashWords.length + '</span></div>' + (rows || '<p class="muted">Aucun mot ajouté pour le moment.</p>') + '</section>';
+}
 function renderAdminUsers() {
   return '<section class="panel admin-list-panel"><div class="panel-heading"><div><span class="eyebrow">COMPTES INSCRITS</span><h2>Élèves et scores</h2></div><span class="count-pill">' + state.users.length + ' compte' + (state.users.length > 1 ? 's' : '') + '</span></div>' +
     (state.users.length ? state.users.map(u => '<div class="admin-list-row"><div class="avatar">' + initials(u.username) + '</div><div class="admin-list-copy"><strong>' + esc(u.username) + '</strong><span>' + (u.role === "admin" ? "Administrateur" : "Élève") + '</span></div><strong class="leader-points">' + u.score + ' pts</strong></div>').join("") : '<p class="muted">Aucun compte pour le moment.</p>') + '</section>';
 }
 function renderAdmin() {
-  const tabs = '<div class="admin-tabs"><button class="' + (state.adminTab === "rules" ? "active" : "") + '" data-action="admin-tab" data-tab="rules">Règles</button><button class="' + (state.adminTab === "exercises" ? "active" : "") + '" data-action="admin-tab" data-tab="exercises">Exercices</button><button class="' + (state.adminTab === "definitions" ? "active" : "") + '" data-action="admin-tab" data-tab="definitions">Définitions</button><button class="' + (state.adminTab === "users" ? "active" : "") + '" data-action="admin-tab" data-tab="users">Comptes</button></div>';
-  let content = state.adminTab === "rules" ? renderAdminRules() : state.adminTab === "exercises" ? renderAdminExercises() : state.adminTab === "definitions" ? renderAdminDefinitions() : renderAdminUsers();
+  const tabs = '<div class="admin-tabs"><button class="' + (state.adminTab === "rules" ? "active" : "") + '" data-action="admin-tab" data-tab="rules">Règles</button><button class="' + (state.adminTab === "exercises" ? "active" : "") + '" data-action="admin-tab" data-tab="exercises">Exercices</button><button class="' + (state.adminTab === "flashcards" ? "active" : "") + '" data-action="admin-tab" data-tab="flashcards">Flashcards</button><button class="' + (state.adminTab === "definitions" ? "active" : "") + '" data-action="admin-tab" data-tab="definitions">Définitions</button><button class="' + (state.adminTab === "users" ? "active" : "") + '" data-action="admin-tab" data-tab="users">Comptes</button></div>';
+  let content = state.adminTab === "rules" ? renderAdminRules() : state.adminTab === "exercises" ? renderAdminExercises() : state.adminTab === "flashcards" ? renderAdminFlashcards() : state.adminTab === "definitions" ? renderAdminDefinitions() : renderAdminUsers();
   renderShell('<div class="admin-welcome"><div><span class="eyebrow light-eyebrow">ESPACE PRIVÉ</span><h2>Le tableau de bord admin.</h2><p>Gère les règles, prépare les entraînements et suis les scores de la classe.</p></div><div class="admin-lock">⚙</div></div>' + tabs + content, "Administration", "Cette zone est réservée au compte administrateur.");
 }
 function renderAccount() {
@@ -208,6 +234,9 @@ function render() {
   if (state.view === "rules") return renderRules();
   if (state.view === "rule-detail") return renderRuleDetail();
   if (state.view === "definition-detail") return renderDefinitionDetail();
+  if (state.view === "flashcards") return renderFlashcards();
+  if (state.view === "flash-runner") return renderFlashRunner();
+  if (state.view === "flash-result") return renderFlashResult();
   if (state.view === "quizzes") return renderQuizzes();
   if (state.view === "quiz-runner") return renderQuizRunner();
   if (state.view === "quiz-result") return renderQuizResult();
@@ -220,12 +249,13 @@ function render() {
 }
 async function loadData() {
   const results = await Promise.all([
-    api("/api/rules"), api("/api/exercises"), api("/api/leaderboard"), api("/api/definitions")
+    api("/api/rules"), api("/api/exercises"), api("/api/leaderboard"), api("/api/definitions"), api("/api/flashcards/words")
   ]);
   state.rules = results[0].rules || [];
   state.exercises = results[1].exercises || [];
   state.leaderboard = results[2].leaderboard || [];
   state.definitions = results[3].definitions || [];
+  state.flashWords = results[4].words || [];
   if (state.me.role === "admin") {
     const admin = await api("/api/admin/users");
     state.users = admin.users || [];
@@ -284,6 +314,14 @@ root.addEventListener("click", async function (event) {
   if (action === "open-rule") { state.selectedRule = button.dataset.id; state.view = "rule-detail"; render(); }
   if (action === "open-definition") { state.selectedDefinition = button.dataset.id; state.view = "definition-detail"; render(); }
   if (action === "start-quiz") await startQuiz(button.dataset.id);
+  if (action === "start-flashcards") {
+    try { const data = await api("/api/flashcards/start", { method: "POST", body: {} }); state.flashSession = data; state.flashIndex = 0; state.flashAnswers = []; state.view = "flash-runner"; render(); }
+    catch (error) { say(error.message, true); }
+  }
+  if (action === "flash-answer") answerFlashcard(button.dataset.answer === "true");
+  if (action === "flash-rule-submit") answerFlashcard(document.getElementById("flash-rule-answer")?.value || "");
+  if (action === "cancel-flashcards") { state.flashSession = null; state.view = "flashcards"; render(); }
+  if (action === "flash-open-rule") { state.selectedRule = button.dataset.id; state.view = "rule-detail"; state.flashResult = null; render(); }
   if (action === "cancel-quiz") { state.activeQuiz = null; state.view = "quizzes"; render(); }
   if (action === "chat-tab") { state.chatTab = button.dataset.tab; try { await loadChat(); render(); } catch (error) { say(error.message, true); } }
   if (action === "refresh-chat") { try { await loadChat(); render(); } catch (error) { say(error.message, true); } }
@@ -328,7 +366,7 @@ root.addEventListener("click", async function (event) {
     try { await api("/api/admin/rules/" + encodeURIComponent(button.dataset.id), { method: "DELETE" }); await loadData(); say("Règle supprimée."); }
     catch (error) { say(error.message, true); }
   }
-  if (action === "delete-exercise") {
+  if (action === "delete-flash-word") {\n    if (!confirm("Supprimer ce mot de la banque de flashcards ?")) return;\n    try { await api("/api/admin/flashcards/words/" + encodeURIComponent(button.dataset.id), { method: "DELETE" }); await loadData(); say("Mot supprimé."); } catch (error) { say(error.message, true); }\n  }\n  if (action === "delete-exercise") {
     if (!confirm("Supprimer cette série d’exercices ?")) return;
     try { await api("/api/admin/exercises/" + encodeURIComponent(button.dataset.id), { method: "DELETE" }); await loadData(); say("Série supprimée."); }
     catch (error) { say(error.message, true); }
@@ -339,7 +377,7 @@ root.addEventListener("submit", async function (event) {
   event.preventDefault();
   state.error = ""; state.notice = "";
   try {
-    if (form.id === "chat-form") {
+    if (form.id === "flashcard-word-form") {\n      const data = new FormData(form);\n      await api("/api/admin/flashcards/words", { method: "POST", body: { ruleId: data.get("ruleId"), word: data.get("word"), isCorrect: data.get("isCorrect") === "true", explanation: data.get("explanation") } });\n      await loadData(); say("Mot ajouté aux flashcards.");\n    }\n    if (form.id === "chat-form") {
       const data = new FormData(form);
       await api("/api/chat/messages", { method: "POST", body: { message: data.get("message") } });
       await loadChat(); render();
