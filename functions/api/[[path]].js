@@ -302,7 +302,7 @@ async function handle(request, env) {
     await env.DB.prepare("INSERT INTO chat_messages (id, user_id, message, created_at) VALUES (?, ?, ?, ?)").bind(id, currentUser.id, message, nowIso()).run();
     return json({ ok: true, id }, 201);
   }
-  const chatMatch = path.match(/^\\/api\\/chat\\/messages\\/([a-zA-Z0-9-]+)$/);
+  const chatMatch = path.match(/^\/api\/chat\/messages\/([a-zA-Z0-9-]+)$/);
   if (chatMatch && method === "DELETE") {
     if (!currentUser) return fail("Connecte-toi pour continuer.", 401);
     const message = await env.DB.prepare("SELECT user_id FROM chat_messages WHERE id = ?").bind(chatMatch[1]).first();
@@ -329,7 +329,7 @@ async function handle(request, env) {
     await env.DB.prepare("INSERT INTO word_suggestions (id, user_id, word, definition, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)").bind(id, currentUser.id, word, definition, nowIso()).run();
     return json({ ok: true, id }, 201);
   }
-  const suggestionMatch = path.match(/^\\/api\\/admin\\/suggestions\\/([a-zA-Z0-9-]+)$/);
+  const suggestionMatch = path.match(/^\/api\/admin\/suggestions\/([a-zA-Z0-9-]+)$/);
   if (suggestionMatch && method === "PATCH") {
     const body = await bodyJson(request);
     const status = cleanText(body.status, 20);
