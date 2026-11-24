@@ -1,7 +1,7 @@
 const root = document.getElementById("app");
 const state = {
   me: null, adminSetupAvailable: false, view: "home", authMode: "login", setupMode: false,
-  rules: [], exercises: [], leaderboard: [], users: [], definitions: [],
+  rules: [], exercises: [], leaderboard: [], users: [], definitions: [], chatMessages: [], suggestions: [], chatTab: "chat",
   selectedRule: null, selectedDefinition: null, activeQuiz: null, quizResult: null,
   adminTab: "rules", editingRule: null, ruleDraft: null, editingDefinition: null, notice: "", error: ""
 };
@@ -79,7 +79,7 @@ function renderShell(content, title, subtitle) {
   const isAdmin = state.me.role === "admin";
   root.innerHTML = '<div class="app-shell"><aside class="sidebar"><div class="brand">' + logo() + '</div>' +
     '<div class="nav-caption">ESPACE DE TRAVAIL</div><nav class="main-nav">' +
-    navButton("home", "⌂", "Accueil") + navButton("rules", "▤", "Liste des règles") + navButton("quizzes", "✎", "Quiz") + navButton("ranking", "♜", "Classement") + navButton("account", "⚙", "Mon compte") +
+    navButton("home", "⌂", "Accueil") + navButton("rules", "▤", "Liste des règles") + navButton("quizzes", "✎", "Quiz") + navButton("ranking", "♜", "Classement") + navButton("chat", "☷", "Tchat") + navButton("account", "⚙", "Mon compte") +
     (isAdmin ? '<div class="nav-caption admin-caption">GESTION</div>' + navButton("admin", "⚙", "Administration") : '') +
     '</nav><div class="sidebar-bottom"><div class="sidebar-tip"><span class="tip-spark">✦</span><strong>Un peu chaque jour</strong><p>La régularité fait toute la différence.</p></div><div class="profile-mini"><div class="avatar">' + initials(state.me.username) + '</div><div class="profile-copy"><strong>' + esc(state.me.username) + '</strong><span>' + (isAdmin ? "Administrateur" : "Élève") + '</span></div><button class="logout-button" title="Se déconnecter" data-action="logout">↪</button></div></div></aside>' +
     '<main class="main-area"><header class="topbar"><div><span class="topbar-kicker">ESPACE DE RÉVISION</span><h1>' + esc(title) + '</h1><p>' + esc(subtitle || "") + '</p></div><div class="topbar-score"><span>TON SCORE</span><strong>' + Number(state.me.score || 0) + '<small> pts</small></strong></div></header>' +
@@ -153,6 +153,23 @@ function renderRanking() {
   const rows = state.leaderboard.map((person, i) => '<div class="leader-row ' + (person.username === state.me.username ? "you-row" : "") + '"><span class="leader-place">' + (i === 0 ? "✦" : String(i + 1).padStart(2, "0")) + '</span><span class="avatar leader-avatar">' + initials(person.username) + '</span><div class="leader-name"><strong>' + esc(person.username) + (person.username === state.me.username ? ' <small>· toi</small>' : '') + '</strong><span>' + (i === 0 ? "En tête du classement" : "Membre de la classe") + '</span></div><strong class="leader-points">' + person.score + ' pts</strong></div>').join("");
   renderShell('<section class="ranking-hero"><span class="eyebrow light-eyebrow">PROGRESSION DE LA CLASSE</span><h2>Chaque point compte.</h2><p>Le classement se met à jour après chaque quiz corrigé.</p></section><section class="panel full-ranking"><div class="panel-heading"><div><span class="eyebrow">TOP DE LA CLASSE</span><h2>Classement général</h2></div><span class="panel-medal">♜</span></div>' + (rows || '<p class="muted">Pas encore de score enregistré.</p>') + '</section>', "Classement", "Découvre la progression de tous les comptes.");
 }
+async function loadChat() {
+  const results = await Promise.all([api("/api/chat/messages"), api("/api/suggestions")]);
+  state.chatMessages = results[0].messages || [];
+  state.suggestions = results[1].suggestions || [];
+}
+function renderChat() {
+  const tabs = '<div class="admin-tabs chat-tabs"><button class="' + (state.chatTab === "chat" ? "active" : "") + '" data-action="chat-tab" data-tab="chat">Discussion</button><button class="' + (state.chatTab === "suggestions" ? "active" : "") + '" data-action="chat-tab" data-tab="suggestions">Suggestions de mots</button></div>';
+  let content = "";
+  if (state.chatTab === "chat") {
+    const messages = state.chatMessages.map(m => '<article class="chat-message"><div class="chat-message-head"><strong>' + esc(m.username) + (m.user_id === state.me.id ? ' <small>· toi</small>' : '') + '</strong><span>' + new Date(m.created_at).toLocaleString("fr-BE") + '</span>' + (m.user_id === state.me.id || state.me.role === "admin" ? '<button class="icon-button danger-icon" data-action="delete-chat-message" data-id="' + esc(m.id) + '" title="Supprimer le message">×</button>' : '') + '</div><p>' + esc(m.message).replace(/\n/g, "<br>") + '</p></article>').join("");
+    content = '<section class="panel chat-panel"><div class="panel-heading"><div><span class="eyebrow">ÉCHANGER ENSEMBLE</span><h2>Discussion générale</h2></div><button class="btn btn-small btn-outline" data-action="refresh-chat">Actualiser</button></div><div class="chat-messages">' + (messages || '<p class="muted">Aucun message pour le moment. Lance la discussion !</p>') + '</div><form id="chat-form" class="chat-compose"><textarea name="message" maxlength="1000" rows="3" required placeholder="Écris ton message…"></textarea><button class="btn btn-primary" type="submit">Envoyer →</button></form><p class="muted small">Reste respectueux : ne partage pas d’informations personnelles et signale les messages inappropriés à l’administrateur.</p></section>';
+  } else {
+    const cards = state.suggestions.map(s => '<article class="suggestion-row"><div class="admin-list-copy"><strong>' + esc(s.word) + '</strong><span>Proposé par ' + esc(s.username) + ' · ' + new Date(s.created_at).toLocaleDateString("fr-BE") + '</span>' + (s.definition ? '<p>' + esc(s.definition) + '</p>' : '') + '</div><span class="suggestion-status status-' + esc(s.status) + '">' + (s.status === "pending" ? "En attente" : s.status === "accepted" ? "Acceptée" : "Refusée") + '</span>' + (state.me.role === "admin" && s.status === "pending" ? '<div class="suggestion-actions"><button class="btn btn-small btn-primary" data-action="review-suggestion" data-id="' + esc(s.id) + '" data-status="accepted">Accepter</button><button class="btn btn-small btn-outline" data-action="review-suggestion" data-id="' + esc(s.id) + '" data-status="rejected">Refuser</button></div>' : '') + '</article>').join("");
+    content = '<section class="panel suggestion-form-panel"><div class="panel-heading"><div><span class="eyebrow">ENRICHIR LE LEXIQUE</span><h2>Proposer un mot à définir</h2></div><span class="admin-panel-icon">✦</span></div><p class="muted">Tu as rencontré un mot difficile ? Propose-le ici. L’administrateur pourra l’ajouter au dictionnaire.</p><form id="suggestion-form" class="form-stack"><label>Mot à proposer<input name="word" maxlength="100" required placeholder="Ex. orthographe"></label><label>Définition proposée <span class="optional">(facultatif)</span><textarea name="definition" rows="3" maxlength="1000" placeholder="Si tu connais sa signification, indique-la…"></textarea></label><button class="btn btn-primary" type="submit">Envoyer ma suggestion →</button></form></section><section class="panel admin-list-panel"><div class="panel-heading"><div><span class="eyebrow">PROPOSITIONS</span><h2>' + (state.me.role === "admin" ? "Suggestions de la classe" : "Mes suggestions") + '</h2></div><button class="btn btn-small btn-outline" data-action="refresh-chat">Actualiser</button></div>' + (cards || '<p class="muted">Aucune suggestion pour le moment.</p>') + '</section>';
+  }
+  renderShell(tabs + content, "Tchat", "Discute avec la classe et propose de nouveaux mots pour le dictionnaire.");
+}
 function getAdminRuleForm() {
   const rule = state.ruleDraft || state.editingRule || { title: "", sections: [{ name: "", rule: "", exception: "" }] };
   const sections = rule.sections.map((section, i) => '<div class="section-editor"><div class="editor-heading"><strong>Partie ' + (i + 1) + '</strong>' + (rule.sections.length > 1 ? '<button class="icon-button" type="button" data-action="remove-section" data-index="' + i + '" title="Supprimer cette partie">×</button>' : '') + '</div><label>Nom de la partie<input name="section-name-' + i + '" value="' + esc(section.name) + '" required placeholder="Ex. Le pluriel des noms"></label><label>Règle<textarea name="section-rule-' + i + '" required rows="3" placeholder="Explique la règle…">' + esc(section.rule) + '</textarea></label><label>Exception <span class="optional">(facultatif)</span><textarea name="section-exception-' + i + '" rows="2" placeholder="Ajoute une exception si nécessaire…">' + esc(section.exception) + '</textarea></label></div>').join("");
@@ -195,6 +212,7 @@ function render() {
   if (state.view === "quiz-runner") return renderQuizRunner();
   if (state.view === "quiz-result") return renderQuizResult();
   if (state.view === "ranking") return renderRanking();
+  if (state.view === "chat") return renderChat();
   if (state.view === "account") return renderAccount();
   if (state.view === "admin" && state.me.role === "admin") return renderAdmin();
   state.view = "home";
@@ -255,6 +273,7 @@ root.addEventListener("click", async function (event) {
     const view = button.dataset.view;
     if (view === "admin" && state.me.role !== "admin") return;
     state.view = view; state.activeQuiz = null; state.quizResult = null;
+    if (view === "chat") { try { await loadChat(); } catch (error) { say(error.message, true); return; } }
     render();
   }
   if (action === "logout") {
@@ -266,6 +285,19 @@ root.addEventListener("click", async function (event) {
   if (action === "open-definition") { state.selectedDefinition = button.dataset.id; state.view = "definition-detail"; render(); }
   if (action === "start-quiz") await startQuiz(button.dataset.id);
   if (action === "cancel-quiz") { state.activeQuiz = null; state.view = "quizzes"; render(); }
+  if (action === "chat-tab") { state.chatTab = button.dataset.tab; try { await loadChat(); render(); } catch (error) { say(error.message, true); } }
+  if (action === "refresh-chat") { try { await loadChat(); render(); } catch (error) { say(error.message, true); } }
+  if (action === "delete-chat-message") {
+    if (!confirm("Supprimer ce message ?")) return;
+    try { await api("/api/chat/messages/" + encodeURIComponent(button.dataset.id), { method: "DELETE" }); await loadChat(); render(); }
+    catch (error) { say(error.message, true); }
+  }
+  if (action === "review-suggestion") {
+    const label = button.dataset.status === "accepted" ? "accepter cette suggestion et l’ajouter au dictionnaire" : "refuser cette suggestion";
+    if (!confirm("Confirmer : " + label + " ?")) return;
+    try { await api("/api/admin/suggestions/" + encodeURIComponent(button.dataset.id), { method: "PATCH", body: { status: button.dataset.status } }); await loadData(); await loadChat(); say(button.dataset.status === "accepted" ? "Suggestion acceptée et mot ajouté au dictionnaire." : "Suggestion refusée."); }
+    catch (error) { say(error.message, true); }
+  }
   if (action === "admin-tab") { state.adminTab = button.dataset.tab; state.editingRule = null; state.ruleDraft = null; state.editingDefinition = null; render(); }
   if (action === "edit-definition") { state.editingDefinition = state.definitions.find(item => item.id === button.dataset.id) || null; state.adminTab = "definitions"; render(); }
   if (action === "cancel-edit-definition") { state.editingDefinition = null; render(); }
@@ -307,6 +339,16 @@ root.addEventListener("submit", async function (event) {
   event.preventDefault();
   state.error = ""; state.notice = "";
   try {
+    if (form.id === "chat-form") {
+      const data = new FormData(form);
+      await api("/api/chat/messages", { method: "POST", body: { message: data.get("message") } });
+      await loadChat(); render();
+    }
+    if (form.id === "suggestion-form") {
+      const data = new FormData(form);
+      await api("/api/suggestions", { method: "POST", body: { word: data.get("word"), definition: data.get("definition") } });
+      await loadChat(); say("Ta suggestion a bien été envoyée à l’administrateur.");
+    }
     if (form.id === "account-form") {
       const data = new FormData(form);
       const newPassword = String(data.get("new-password") || "");
