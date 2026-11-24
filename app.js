@@ -1,6 +1,6 @@
 const root = document.getElementById("app");
 const state = {
-  me: null, adminSetupAvailable: false, view: "home", authMode: "login", setupMode: false,
+  me: null, adminSetupAvailable: false, offlineMode: false, view: "home", authMode: "login", setupMode: false,
   rules: [], exercises: [], leaderboard: [], users: [], definitions: [], chatMessages: [], suggestions: [], chatTab: "chat",
   selectedRule: null, selectedDefinition: null, activeQuiz: null, quizResult: null,
   adminTab: "rules", editingRule: null, ruleDraft: null, editingDefinition: null, flashWords: [], flashSession: null, flashIndex: 0, flashAnswers: [], flashResult: null, flashDragStart: null, notice: "", error: ""
@@ -77,13 +77,12 @@ function navButton(view, symbol, label) {
 }
 function renderShell(content, title, subtitle) {
   const isAdmin = state.me.role === "admin";
+  const navigation = state.offlineMode ? navButton("rules", "▤", "Liste des règles") : navButton("home", "⌂", "Accueil") + navButton("rules", "▤", "Liste des règles") + navButton("flashcards", "▣", "Flashcards") + navButton("quizzes", "✎", "Quiz") + navButton("ranking", "♜", "Classement") + navButton("chat", "☷", "Tchat") + navButton("account", "⚙", "Mon compte") + (isAdmin ? '<div class="nav-caption admin-caption">GESTION</div>' + navButton("admin", "⚙", "Administration") : '');
+  const profile = state.offlineMode ? '<div class="sidebar-bottom"><div class="sidebar-tip"><strong>Mode hors connexion</strong><p>Seules les règles enregistrées sont disponibles.</p></div></div>' : '<div class="sidebar-bottom"><div class="sidebar-tip"><span class="tip-spark">✦</span><strong>Un peu chaque jour</strong><p>La régularité fait toute la différence.</p></div><div class="profile-mini"><div class="avatar">' + initials(state.me.username) + '</div><div class="profile-copy"><strong>' + esc(state.me.username) + '</strong><span>' + (isAdmin ? "Administrateur" : "Élève") + '</span></div><button class="logout-button" title="Se déconnecter" data-action="logout">↪</button></div></div>';
   root.innerHTML = '<div class="app-shell"><aside class="sidebar"><div class="brand">' + logo() + '</div>' +
-    '<div class="nav-caption">ESPACE DE TRAVAIL</div><nav class="main-nav">' +
-    navButton("home", "⌂", "Accueil") + navButton("rules", "▤", "Liste des règles") + navButton("flashcards", "▣", "Flashcards") + navButton("quizzes", "✎", "Quiz") + navButton("ranking", "♜", "Classement") + navButton("chat", "☷", "Tchat") + navButton("account", "⚙", "Mon compte") +
-    (isAdmin ? '<div class="nav-caption admin-caption">GESTION</div>' + navButton("admin", "⚙", "Administration") : '') +
-    '</nav><div class="sidebar-bottom"><div class="sidebar-tip"><span class="tip-spark">✦</span><strong>Un peu chaque jour</strong><p>La régularité fait toute la différence.</p></div><div class="profile-mini"><div class="avatar">' + initials(state.me.username) + '</div><div class="profile-copy"><strong>' + esc(state.me.username) + '</strong><span>' + (isAdmin ? "Administrateur" : "Élève") + '</span></div><button class="logout-button" title="Se déconnecter" data-action="logout">↪</button></div></div></aside>' +
-    '<main class="main-area"><header class="topbar"><div><span class="topbar-kicker">ESPACE DE RÉVISION</span><h1>' + esc(title) + '</h1><p>' + esc(subtitle || "") + '</p></div><div class="topbar-score"><span>TON SCORE</span><strong>' + Number(state.me.score || 0) + '<small> pts</small></strong></div></header>' +
-    '<div class="page-content">' + noticeHTML() + content + '</div><footer class="page-footer">OrthoLab <span>·</span> Chaque exercice est une occasion de progresser.</footer></main></div>';
+    '<div class="nav-caption">ESPACE DE TRAVAIL</div><nav class="main-nav">' + navigation + '</nav>' + profile + '</aside>' +
+    '<main class="main-area"><header class="topbar"><div><span class="topbar-kicker">ESPACE DE RÉVISION</span><h1>' + esc(title) + '</h1><p>' + esc(subtitle || "") + '</p></div>' + (state.offlineMode ? '<span class="rule-tag">HORS CONNEXION</span>' : '<div class="topbar-score"><span>TON SCORE</span><strong>' + Number(state.me.score || 0) + '<small> pts</small></strong></div>') + '</header>' +
+    '<div class="page-content">' + noticeHTML() + (state.offlineMode ? '<div class="alert alert-success" role="status">Tu consultes les règles sauvegardées sur cet appareil. Les exercices nécessitent une connexion Internet.</div>' : '') + content + '</div><footer class="page-footer">OrthoLab <span>·</span> Chaque exercice est une occasion de progresser.</footer></main></div>';
 }
 function renderHome() {
   const completed = state.exercises.length;
@@ -267,6 +266,7 @@ async function loadData() {
     const admin = await api("/api/admin/users");
     state.users = admin.users || [];
   }
+  try { localStorage.setItem("ortholab-offline-rules-v1", JSON.stringify({ rules: state.rules, definitions: state.definitions, savedAt: Date.now() })); } catch {}
 }
 async function refreshMe() {
   const data = await api("/api/me");
@@ -308,6 +308,7 @@ root.addEventListener("click", async function (event) {
   if (action === "back-auth") { state.setupMode = false; render(); }
   if (action === "navigate") {
     const view = button.dataset.view;
+    if (state.offlineMode && view !== "rules") return;
     if (view === "admin" && state.me.role !== "admin") return;
     state.view = view; state.activeQuiz = null; state.quizResult = null;
     if (view === "chat") { try { await loadChat(); } catch (error) { say(error.message, true); return; } }
@@ -500,8 +501,20 @@ root.addEventListener("submit", async function (event) {
   } catch (error) { say(error.message, true); }
 });
 (async function init() {
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/service-worker.js").catch(() => {});
   try { await refreshMe(); }
   catch (error) {
-    root.innerHTML = '<div class="auth-page"><div class="auth-card"><div class="brand">' + logo() + '</div><h1>Le site n’est pas encore configuré.</h1><p>' + esc(error.message) + '</p><p class="muted">Vérifie la connexion à la base D1 en suivant le guide du dépôt.</p></div></div>';
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem("ortholab-offline-rules-v1") || "null"); } catch {}
+    if (saved && Array.isArray(saved.rules) && saved.rules.length) {
+      state.rules = saved.rules;
+      state.definitions = Array.isArray(saved.definitions) ? saved.definitions : [];
+      state.me = { username: "Mode hors connexion", role: "student", score: 0 };
+      state.offlineMode = true;
+      state.view = "rules";
+      render();
+    } else {
+      root.innerHTML = '<div class="auth-page"><div class="auth-card"><div class="brand">' + logo() + '</div><h1>Connexion nécessaire</h1><p>Connecte-toi une première fois avec Internet pour enregistrer les règles sur cet appareil. Ensuite, tu pourras les consulter sans Wi-Fi.</p><p class="muted">Les exercices restent disponibles uniquement avec une connexion Internet.</p></div></div>';
+    }
   }
 })();
