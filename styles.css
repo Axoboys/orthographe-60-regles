@@ -383,3 +383,34 @@ input::placeholder, textarea::placeholder { color: #b2aec0; }
   .suggestion-actions { width: 100%; }
   .suggestion-actions .btn { flex: 1; }
 }
+
+/* Flashcards */
+.flash-intro { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:30px; margin-bottom:16px; border-radius:18px; color:#fff; background:linear-gradient(115deg,#514797,#897bd1); }
+.flash-intro h2 { font:800 25px "Manrope",sans-serif; margin:8px 0; }
+.flash-intro p { color:rgba(255,255,255,.82); font-size:12px; line-height:1.7; max-width:550px; }
+.flash-intro-number { font:800 88px "Manrope",sans-serif; color:rgba(255,255,255,.2); }
+.flash-progress { max-width:760px; margin:0 auto 16px; }
+.flash-progress > div:first-child { display:flex; justify-content:space-between; font-size:11px; margin-bottom:8px; }
+.flash-progress-track { height:7px; background:#eae7f2; border-radius:20px; overflow:hidden; }
+.flash-progress-track span { display:block; height:100%; background:var(--purple); border-radius:20px; transition:width .2s; }
+.flash-card { max-width:760px; min-height:390px; margin:0 auto 16px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:35px; touch-action:pan-y; user-select:none; }
+.flash-word { font:800 clamp(30px,6vw,52px) "Manrope",sans-serif; color:var(--purple-dark); overflow-wrap:anywhere; margin:35px 0 12px; }
+.flash-card > .muted { font-size:12px; }
+.flash-zones { width:100%; display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:35px 0 15px; }
+.flash-zone { border-radius:12px; padding:18px 10px; font-weight:800; font-size:12px; }
+.zone-green { color:#187a55; background:#e5f6ee; }
+.zone-red { color:#b33e3e; background:#fff0ed; }
+.flash-actions { display:flex; width:100%; gap:12px; }
+.flash-actions .btn { flex:1; padding:14px; }
+.btn-success { background:#18845b; color:white; }
+.btn-danger { background:#c74646; color:white; }
+.flash-rule-label { color:var(--purple); font-size:10px; font-weight:800; letter-spacing:.08em; margin-bottom:15px; }
+.flash-rule-answer { width:100%; max-width:620px; border:1px solid #e6e3ee; border-radius:12px; padding:14px; font:13px/1.7 "DM Sans",sans-serif; resize:vertical; margin:12px 0 16px; }
+.flash-result-row { display:flex; gap:12px; padding:14px 0; border-top:1px solid #f0eef5; font-size:11px; }
+.flash-result-row > span { font-weight:900; font-size:18px; }
+.flash-result-row > div { flex:1; min-width:0; }
+.flash-result-row p { color:var(--muted); line-height:1.6; overflow-wrap:anywhere; margin:6px 0; }
+.flash-result-row .link-button { margin-top:5px; }
+.flash-result-row.is-correct > span { color:#329576; }
+.flash-result-row.is-wrong > span { color:#d17b5e; }
+@media(max-width:650px) { .flash-intro { padding:22px; } .flash-intro-number { font-size:55px; } .flash-card { min-height:360px; padding:20px 15px; } .flash-actions { flex-direction:column; } .flash-zone { padding:13px 6px; font-size:10px; } }
