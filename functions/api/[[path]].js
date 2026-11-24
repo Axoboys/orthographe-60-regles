@@ -305,19 +305,26 @@ async function handle(request, env) {
     const selectedWords = shuffle(words).slice(0, 27).map(w => ({ kind: "word", id: w.id, ruleId: w.rule_id, word: w.word, correct: !!w.is_correct, explanation: w.explanation }));
     const selectedRules = shuffle(availableRules).slice(0, 3).map(r => {
       const sections = JSON.parse(r.sections_json);
-      return { id: r.id, title: r.title, expected: sections.map(s => [s.name, s.rule, s.exception].filter(Boolean).join(" ")).join(" ") };
+      return { id: r.id, title: r.title, expected: sections.map(s => [s.name, s.rule, s.exception].filter(Boolean).join(" ")) };
     });
+    const ruleOptions = shuffle(availableRules).map(r => ({ id: r.id, title: r.title }));
     const cards = [];
     let wi = 0, ri = 0;
-    for (let n = 1; n <= 30; n++) cards.push(n % 10 === 0
-      ? { kind: "rule", rule: selectedRules[ri++] }
-      : selectedWords[wi++]);
+    for (let n = 1; n <= 30; n++) {
+      if (n % 10 === 0) cards.push({ kind: "rule", rule: selectedRules[ri++] });
+      else if (n % 5 === 0) {
+        const word = selectedWords[wi++];
+        cards.push({ kind: "identify", word: word.word, ruleId: word.ruleId, options: ruleOptions });
+      } else cards.push(selectedWords[wi++]);
+    }
     const id = randomId();
     await env.DB.prepare("INSERT INTO flashcard_sessions (id, user_id, cards_json, created_at) VALUES (?, ?, ?, ?)")
       .bind(id, currentUser.id, JSON.stringify(cards), nowIso()).run();
-    return json({ sessionId: id, cards: cards.map(c => c.kind === "word"
-      ? { kind: c.kind, word: c.word, position: cards.indexOf(c) + 1 }
-      : { kind: c.kind, title: c.rule.title, position: cards.indexOf(c) + 1 }) }, 201);
+    return json({ sessionId: id, cards: cards.map((c, i) => c.kind === "word"
+      ? { kind: c.kind, word: c.word, position: i + 1 }
+      : c.kind === "identify"
+        ? { kind: c.kind, word: c.word, options: c.options, position: i + 1 }
+        : { kind: c.kind, title: c.rule.title, position: i + 1 }) }, 201);
   }
   if (method === "POST" && path === "/api/flashcards/submit") {
     if (!currentUser) return fail("Connecte-toi pour envoyer tes réponses.", 401);
