@@ -271,6 +271,84 @@ async function handle(request, env) {
     if (currentUser.role !== "admin") return fail("Accès réservé à l’administration.", 403);
   }
 
+  if (method === "GET" && path === "/api/flashcards/words") {
+    if (!currentUser) return fail("Connecte-toi pour continuer.", 401);
+    const rows = await env.DB.prepare("SELECT w.id, w.rule_id, w.word, w.is_correct, w.explanation, r.title AS rule_title FROM flashcard_words w JOIN rules r ON r.id = w.rule_id ORDER BY w.created_at DESC").all();
+    return json({ words: rows.results || [] });
+  }
+  if (method === "POST" && path === "/api/admin/flashcards/words") {
+    const body = await bodyJson(request);
+    const ruleId = cleanText(body.ruleId, 80), word = cleanText(body.word, 100);
+    const explanation = cleanText(body.explanation, 500);
+    const isCorrect = body.isCorrect === true;
+    const rule = await env.DB.prepare("SELECT id FROM rules WHERE id = ?").bind(ruleId).first();
+    if (!rule || !word) return fail("Choisis une règle et saisis un mot.");
+    const id = randomId();
+    await env.DB.prepare("INSERT INTO flashcard_words (id, rule_id, word, is_correct, explanation, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(id, ruleId, word, isCorrect ? 1 : 0, explanation, nowIso()).run();
+    return json({ ok: true, id }, 201);
+  }
+  const flashWordMatch = path.match(/^\/api\/admin\/flashcards\/words\/([a-zA-Z0-9-]+)$/);
+  if (flashWordMatch && method === "DELETE") {
+    await env.DB.prepare("DELETE FROM flashcard_words WHERE id = ?").bind(flashWordMatch[1]).run();
+    return json({ ok: true });
+  }
+  if (method === "POST" && path === "/api/flashcards/start") {
+    if (!currentUser) return fail("Connecte-toi pour commencer.", 401);
+    const rows = await env.DB.prepare("SELECT id, rule_id, word, is_correct, explanation FROM flashcard_words").all();
+    const rules = await env.DB.prepare("SELECT id, title, sections_json FROM rules").all();
+    const words = rows.results || [];
+    const availableRules = rules.results || [];
+    if (words.length < 27) return fail("Il faut au moins 27 mots dans l’administration pour lancer une séance.");
+    if (availableRules.length < 3) return fail("Il faut au moins 3 règles enregistrées pour les trois questions de rédaction.");
+    const shuffle = list => [...list].sort(() => Math.random() - 0.5);
+    const selectedWords = shuffle(words).slice(0, 27).map(w => ({ kind: "word", id: w.id, ruleId: w.rule_id, word: w.word, correct: !!w.is_correct, explanation: w.explanation }));
+    const selectedRules = shuffle(availableRules).slice(0, 3).map(r => {
+      const sections = JSON.parse(r.sections_json);
+      return { id: r.id, title: r.title, expected: sections.map(s => [s.name, s.rule, s.exception].filter(Boolean).join(" ")).join(" ") };
+    });
+    const cards = [];
+    let wi = 0, ri = 0;
+    for (let n = 1; n <= 30; n++) cards.push(n % 10 === 0
+      ? { kind: "rule", rule: selectedRules[ri++] }
+      : selectedWords[wi++]);
+    const id = randomId();
+    await env.DB.prepare("INSERT INTO flashcard_sessions (id, user_id, cards_json, created_at) VALUES (?, ?, ?, ?)")
+      .bind(id, currentUser.id, JSON.stringify(cards), nowIso()).run();
+    return json({ sessionId: id, cards: cards.map(c => c.kind === "word"
+      ? { kind: c.kind, word: c.word, position: cards.indexOf(c) + 1 }
+      : { kind: c.kind, title: c.rule.title, position: cards.indexOf(c) + 1 }) }, 201);
+  }
+  if (method === "POST" && path === "/api/flashcards/submit") {
+    if (!currentUser) return fail("Connecte-toi pour envoyer tes réponses.", 401);
+    const body = await bodyJson(request);
+    const session = await env.DB.prepare("SELECT * FROM flashcard_sessions WHERE id = ? AND user_id = ?").bind(cleanText(body.sessionId, 80), currentUser.id).first();
+    if (!session) return fail("Séance introuvable.", 404);
+    if (session.submitted_at) return fail("Cette séance a déjà été corrigée.", 409);
+    const cards = JSON.parse(session.cards_json);
+    if (!Array.isArray(body.answers) || body.answers.length !== 30) return fail("La séance doit contenir 30 réponses.");
+    const normalize = value => String(value || "").toLocaleLowerCase("fr").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
+    const ignored = new Set(["dans","avec","pour","mais","donc","car","une","des","les","aux","sur","sous","par","que","qui","est","sont","être","avoir","plus","lorsque","quand","tout","tous","toute","toutes","leur","leurs","elle","elles","ils","nous","vous","cela","ceci","apres","avant","entre","ainsi","comme","sans","pas","non","oui","son","ses","cet","cette","ces","du","de","la","le","un","et","ou","a","au","en","on","se","sa","son"]);
+    const important = value => normalize(value).filter(w => w.length > 2 && !ignored.has(w));
+    const results = cards.map((card, i) => {
+      const answer = body.answers[i];
+      if (card.kind === "word") {
+        const correct = typeof answer === "boolean" && answer === card.correct;
+        return { position: i + 1, kind: "word", correct, word: card.word, expected: card.correct ? "Correctement orthographié" : "Orthographe incorrecte", explanation: card.explanation, ruleId: card.ruleId };
+      }
+      const expected = important(card.rule.expected), actual = important(typeof answer === "string" ? answer : "");
+      let cursor = 0;
+      for (const token of actual) if (token === expected[cursor]) cursor++;
+      const correct = expected.length > 0 && cursor === expected.length;
+      return { position: i + 1, kind: "rule", correct, title: card.rule.title, expectedText: card.rule.expected, answer: typeof answer === "string" ? answer : "", ruleId: card.rule.id };
+    });
+    const points = results.filter(r => r.correct).length * 0.5;
+    await env.DB.prepare("UPDATE flashcard_sessions SET submitted_at = ? WHERE id = ? AND submitted_at IS NULL").bind(nowIso(), session.id).run();
+    await env.DB.prepare("UPDATE users SET score = score + ? WHERE id = ?").bind(points, currentUser.id).run();
+    const updated = await env.DB.prepare("SELECT score FROM users WHERE id = ?").bind(currentUser.id).first();
+    return json({ results, points, score: updated.score });
+  }
+
   if (method === "GET" && path === "/api/rules") {
     const rows = await env.DB.prepare("SELECT id, title, sections_json, created_at, updated_at FROM rules ORDER BY created_at DESC").all();
     return json({ rules: (rows.results || []).map(r => ({ id: r.id, title: r.title, sections: JSON.parse(r.sections_json), createdAt: r.created_at, updatedAt: r.updated_at })) });
