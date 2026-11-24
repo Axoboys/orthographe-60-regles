@@ -337,11 +337,16 @@ async function handle(request, env) {
     const normalize = value => String(value || "").toLocaleLowerCase("fr").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
     const ignored = new Set(["dans","avec","pour","mais","donc","car","une","des","les","aux","sur","sous","par","que","qui","est","sont","être","avoir","plus","lorsque","quand","tout","tous","toute","toutes","leur","leurs","elle","elles","ils","nous","vous","cela","ceci","apres","avant","entre","ainsi","comme","sans","pas","non","oui","son","ses","cet","cette","ces","du","de","la","le","un","et","ou","a","au","en","on","se","sa","son"]);
     const important = value => normalize(value).filter(w => w.length > 2 && !ignored.has(w));
+    const availableRuleTitles = new Map((await env.DB.prepare("SELECT id, title FROM rules").all()).results.map(r => [r.id, r.title]));
     const results = cards.map((card, i) => {
       const answer = body.answers[i];
       if (card.kind === "word") {
         const correct = typeof answer === "boolean" && answer === card.correct;
         return { position: i + 1, kind: "word", correct, word: card.word, expected: card.correct ? "Correctement orthographié" : "Orthographe incorrecte", explanation: card.explanation, ruleId: card.ruleId };
+      }
+      if (card.kind === "identify") {
+        const correct = typeof answer === "string" && answer === card.ruleId;
+        return { position: i + 1, kind: "identify", correct, word: card.word, expected: availableRuleTitles.get(card.ruleId) || "Règle associée", ruleId: card.ruleId };
       }
       const expected = important(card.rule.expected), actual = important(typeof answer === "string" ? answer : "");
       let cursor = 0;
