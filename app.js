@@ -160,7 +160,12 @@ function renderFlashResult() {
   const rows = result.results.map(r => '<article class="flash-result-row ' + (r.correct ? 'is-correct' : 'is-wrong') + '"><span>' + (r.correct ? '✓' : '×') + '</span><div><strong>Question ' + r.position + ' · ' + (r.kind === "word" ? esc(r.word) : esc(r.title)) + '</strong>' + (!r.correct ? (r.kind === "word" ? '<p>Réponse attendue : ' + esc(r.expected) + '</p>' : '<p>Règle attendue : ' + esc(r.expectedText) + '</p><details><summary>Ta réponse</summary><p>' + esc(r.answer) + '</p></details>') : '') + (r.explanation ? '<p>' + esc(r.explanation) + '</p>' : '') + (r.ruleId ? '<button class="link-button" data-action="flash-open-rule" data-id="' + esc(r.ruleId) + '">Voir la règle et ses exercices →</button>' : '') + '</div></article>').join("");
   renderShell('<section class="result-hero"><span class="eyebrow light-eyebrow">SÉANCE TERMINÉE</span><h2>' + (mistakes.length ? 'Voici ce que tu peux encore travailler.' : 'Excellent travail !') + '</h2><div class="result-score">+' + result.points.toFixed(1) + '<small> points</small></div><p>Score total : <strong>' + result.score + ' points</strong></p><p>' + (30 - mistakes.length) + ' bonnes réponses sur 30</p></section><section class="panel result-panel"><div class="panel-heading"><div><span class="eyebrow">CORRECTION</span><h2>' + mistakes.length + ' erreur' + (mistakes.length > 1 ? 's' : '') + ' à revoir</h2></div></div>' + (rows || '<p class="muted">Aucune réponse à corriger.</p>') + '</section><div class="result-actions"><button class="btn btn-primary" data-action="navigate" data-view="flashcards">Nouvelle séance</button><button class="btn btn-outline" data-action="navigate" data-view="rules">Revoir les règles</button></div>', "Résultat des flashcards", "Retrouve tes erreurs et entraîne-toi sur les règles associées.");
 }
-function answerFlashcard(answer) {\n  state.flashAnswers.push(answer);\n  if (state.flashIndex < 29) { state.flashIndex++; render(); return; }\n  (async () => { try { const result = await api("/api/flashcards/submit", { method: "POST", body: { sessionId: state.flashSession.sessionId, answers: state.flashAnswers } }); state.flashResult = result; state.me.score = result.score; state.flashSession = null; await loadData(); state.view = "flash-result"; render(); } catch (error) { say(error.message, true); } })();\n}\nfunction renderDefinitionDetail() {
+function answerFlashcard(answer) {
+  state.flashAnswers.push(answer);
+  if (state.flashIndex < 29) { state.flashIndex++; render(); return; }
+  (async () => { try { const result = await api("/api/flashcards/submit", { method: "POST", body: { sessionId: state.flashSession.sessionId, answers: state.flashAnswers } }); state.flashResult = result; state.me.score = result.score; state.flashSession = null; await loadData(); state.view = "flash-result"; render(); } catch (error) { say(error.message, true); } })();
+}
+function renderDefinitionDetail() {
   const definition = state.definitions.find(item => item.id === state.selectedDefinition);
   if (!definition) { state.view = "rules"; return renderRules(); }
   const content = '<button class="back-link" data-action="navigate" data-view="rules">← Retour aux règles</button><section class="panel definition-detail"><span class="eyebrow">DÉFINITION</span><h2>' + esc(definition.word) + '</h2><p>' + esc(definition.definition).replace(/\n/g, "<br>") + '</p></section>';
@@ -366,7 +371,11 @@ root.addEventListener("click", async function (event) {
     try { await api("/api/admin/rules/" + encodeURIComponent(button.dataset.id), { method: "DELETE" }); await loadData(); say("Règle supprimée."); }
     catch (error) { say(error.message, true); }
   }
-  if (action === "delete-flash-word") {\n    if (!confirm("Supprimer ce mot de la banque de flashcards ?")) return;\n    try { await api("/api/admin/flashcards/words/" + encodeURIComponent(button.dataset.id), { method: "DELETE" }); await loadData(); say("Mot supprimé."); } catch (error) { say(error.message, true); }\n  }\n  if (action === "delete-exercise") {
+  if (action === "delete-flash-word") {
+    if (!confirm("Supprimer ce mot de la banque de flashcards ?")) return;
+    try { await api("/api/admin/flashcards/words/" + encodeURIComponent(button.dataset.id), { method: "DELETE" }); await loadData(); say("Mot supprimé."); } catch (error) { say(error.message, true); }
+  }
+  if (action === "delete-exercise") {
     if (!confirm("Supprimer cette série d’exercices ?")) return;
     try { await api("/api/admin/exercises/" + encodeURIComponent(button.dataset.id), { method: "DELETE" }); await loadData(); say("Série supprimée."); }
     catch (error) { say(error.message, true); }
@@ -377,7 +386,12 @@ root.addEventListener("submit", async function (event) {
   event.preventDefault();
   state.error = ""; state.notice = "";
   try {
-    if (form.id === "flashcard-word-form") {\n      const data = new FormData(form);\n      await api("/api/admin/flashcards/words", { method: "POST", body: { ruleId: data.get("ruleId"), word: data.get("word"), isCorrect: data.get("isCorrect") === "true", explanation: data.get("explanation") } });\n      await loadData(); say("Mot ajouté aux flashcards.");\n    }\n    if (form.id === "chat-form") {
+    if (form.id === "flashcard-word-form") {
+      const data = new FormData(form);
+      await api("/api/admin/flashcards/words", { method: "POST", body: { ruleId: data.get("ruleId"), word: data.get("word"), isCorrect: data.get("isCorrect") === "true", explanation: data.get("explanation") } });
+      await loadData(); say("Mot ajouté aux flashcards.");
+    }
+    if (form.id === "chat-form") {
       const data = new FormData(form);
       await api("/api/chat/messages", { method: "POST", body: { message: data.get("message") } });
       await loadChat(); render();
