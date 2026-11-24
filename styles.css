@@ -414,3 +414,15 @@ input::placeholder, textarea::placeholder { color: #b2aec0; }
 .flash-result-row.is-correct > span { color:#329576; }
 .flash-result-row.is-wrong > span { color:#d17b5e; }
 @media(max-width:650px) { .flash-intro { padding:22px; } .flash-intro-number { font-size:55px; } .flash-card { min-height:360px; padding:20px 15px; } .flash-actions { flex-direction:column; } .flash-zone { padding:13px 6px; font-size:10px; } }
+
+
+/* Indicateur de connexion réseau */
+.topbar-tools { display:flex; align-items:center; gap:14px; flex:0 0 auto; }
+.network-status { display:inline-flex; align-items:center; gap:7px; padding:8px 11px; border:1px solid var(--line); border-radius:30px; background:#fff; color:#277d62; font-size:10px; font-weight:800; white-space:nowrap; }
+.network-status-dot { width:8px; height:8px; flex:0 0 8px; border-radius:50%; background:#2da77a; box-shadow:0 0 0 3px rgba(45,167,122,.12); }
+.network-status.is-offline { color:#a74d43; background:#fff8f6; border-color:#f2ddd8; }
+.network-status.is-offline .network-status-dot { background:#d16a5c; box-shadow:0 0 0 3px rgba(209,106,92,.12); }
+@media (max-width:650px) {
+  .topbar-tools { gap:7px; flex-direction:column; align-items:flex-end; }
+  .network-status { padding:6px 8px; font-size:9px; }
+}
